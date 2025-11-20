@@ -117,7 +117,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 	end
 
 	local exec = (isStudio and "Studio (Debug)" or identifyexecutor()) or "Unknown"
-	HomeTabPage.detailsholder.dashboard.Client.Title.Text =  "You are using" .. exec
+	HomeTabPage.detailsholder.dashboard.Client.Title.Text =  "You are using " .. exec
 
 	if isStudio then
 		HomeTabPage.detailsholder.dashboard.Client.Subtitle.Text = "Aurexis Interface Library - Debugging Mode"
