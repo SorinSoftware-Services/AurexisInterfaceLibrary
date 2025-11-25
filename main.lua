@@ -119,10 +119,11 @@ local compatibilityPlaces = {
 
 local compatibilityUniverses = {
 	[5650396773] = true, -- a dusty trip universe
-	[7848646653] = true, -- Break your Bones
-	[6401952734] = true, -- PETS GO!
 	[3989869156] = true, -- ANTS WAR
 	[111958650] = true,  -- Arsenal
+	[7848646653] = true, -- Break your Bones
+	[6401952734] = true, -- PETS GO!
+	[6035872082] = true, --RIVALS
 }
 
 if compatibilityPlaces[game.PlaceId] or compatibilityUniverses[game.GameId] then
