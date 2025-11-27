@@ -36,7 +36,7 @@ by Nebula Softworks
 
 local BASE_URL = "https://raw.githubusercontent.com/SorinSoftware-Services/AurexisInterfaceLibrary/Premium/"
 
-local Release = "Pre Release [v 0.2.2]"
+local Release = "Pre Release [v 0.2.1]"
 
 local Aurexis = { 
 	Folder = "AurexisLibrary UI", 
@@ -1529,7 +1529,7 @@ function Aurexis:CreateWindow(WindowSettings)
 		Subtitle = "Credits: LunaInterfaceSuite",
 		LogoID = "84637769762084",
 		LoadingEnabled = true,
-		LoadingTitle = "Aurexis Interface Library",
+		LoadingTitle = "SorinScriptHub - Premium",
 		LoadingSubtitle = "by SorinSoftware Services",
 
 		ConfigSettings = {},
