@@ -62,6 +62,33 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		HomeTabPage.player.user.Text = "You are using <b>" .. Release .. "</b>"
 	end
 
+	-- warm tint for key cards on the home dashboard
+	local warmBase = Color3.fromRGB(32, 30, 26)
+	local warmStroke = Color3.fromRGB(80, 72, 62)
+	local function styleFrame(frame)
+		if not frame or not frame:IsA("Frame") then
+			return
+		end
+		frame.BackgroundColor3 = warmBase
+		local stroke = frame:FindFirstChildWhichIsA("UIStroke")
+		if stroke then
+			stroke.Color = warmStroke
+			stroke.Transparency = 0.45
+		end
+	end
+	styleFrame(HomeTabPage)
+	local detailsHolder = HomeTabPage:FindFirstChild("detailsholder")
+	if detailsHolder then
+		styleFrame(detailsHolder)
+		local dashboard = detailsHolder:FindFirstChild("dashboard")
+		if dashboard then
+			styleFrame(dashboard)
+			for _, child in ipairs(dashboard:GetChildren()) do
+				styleFrame(child)
+			end
+		end
+	end
+
 	local function getGreeting()
 		local ok, now = pcall(os.date, "*t")
 		local hour = (ok and now and now.hour) or 12
