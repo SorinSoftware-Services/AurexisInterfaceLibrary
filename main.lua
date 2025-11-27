@@ -43,9 +43,9 @@ local Aurexis = {
 	Options = {}, 
 	AllowEnvironmentBlur = true,
 	ThemeGradient = ColorSequence.new{
-		ColorSequenceKeypoint.new(0.00, Color3.fromRGB(173, 216, 255)), -- baby blue
-		ColorSequenceKeypoint.new(0.50, Color3.fromRGB(100, 149, 237)), -- medium blue
-		ColorSequenceKeypoint.new(1.00, Color3.fromRGB(195, 144, 255))  -- lilac
+		ColorSequenceKeypoint.new(0.00, Color3.fromRGB(58, 55, 50)),   -- warm gray base
+		ColorSequenceKeypoint.new(0.50, Color3.fromRGB(86, 78, 64)),   -- mid gray with warmth
+		ColorSequenceKeypoint.new(1.00, Color3.fromRGB(231, 190, 96))  -- amber accent
 	} 
 }
 
@@ -924,6 +924,18 @@ local Controls = Main.Controls
 local closeButton = Controls and Controls:FindFirstChild("Close", true) or nil
 local toggleSizeButton = Controls and Controls:FindFirstChild("ToggleSize", true) or nil
 local minimizeButton = Controls and Controls:FindFirstChild("Minimize", true) or nil
+
+-- Apply a subtle warm tint to the main background/gradient
+local warmGradient = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(42, 40, 36)),
+	ColorSequenceKeypoint.new(0.6, Color3.fromRGB(66, 60, 52)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(230, 190, 105)),
+})
+local mainGradient = Main:FindFirstChildWhichIsA("UIGradient") or Main:FindFirstChildWhichIsA("UIGradient", true)
+if mainGradient then
+	mainGradient.Color = warmGradient
+end
+Main.BackgroundColor3 = Color3.fromRGB(40, 38, 34)
 
 if not minimizeButton and closeButton then
 	minimizeButton = closeButton:Clone()
