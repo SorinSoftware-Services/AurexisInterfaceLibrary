@@ -35,8 +35,6 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 
 		Elements.UIPageLayout:JumpTo(HomeTabPage)
 
-		task.wait(0.05)
-
 		for _, OtherTabButton in ipairs(Navigation.Tabs:GetChildren()) do
 			if OtherTabButton.Name ~= "InActive Template" and OtherTabButton.ClassName == "Frame" and OtherTabButton ~= HomeTabButton then
 				tween(OtherTabButton.ImageLabel, {ImageColor3 = Color3.fromRGB(221,221,221)})
