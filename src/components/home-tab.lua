@@ -459,7 +459,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		end
 	end
 
-		coroutine.wrap(function()
+	task.spawn(function()
 	local refreshTimer = 0
 
 	while task.wait(0.5) do
@@ -521,7 +521,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			refreshTimer -= 0.5
 		end
 	end
-end)()
+end)
 
 end
 end 
