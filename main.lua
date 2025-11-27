@@ -1255,6 +1255,14 @@ end
 
 local LayeredLoadingSpinner = createLayeredSpinner(LoadingFrame and LoadingFrame.Frame and LoadingFrame.Frame:FindFirstChild("ImageLabel"))
 local Tabs = Navigation.Tabs
+if Tabs and Tabs:IsA("ScrollingFrame") then
+	Tabs.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	Tabs.CanvasSize = UDim2.new(0, 0, 0, 0)
+	Tabs.ScrollingDirection = Enum.ScrollingDirection.Y
+	Tabs.ScrollBarThickness = Tabs.ScrollBarThickness == 0 and 4 or Tabs.ScrollBarThickness
+	Tabs.ScrollBarImageTransparency = 0.35
+	Tabs.ClipsDescendants = true
+end
 local Notifications = AurexisUI.Notifications
 local KeySystem : Frame = Main.KeySystem
 
@@ -1926,10 +1934,10 @@ FirstTab = false
 		TabPage.Parent = Elements
 
 		function Tab:Activate()
-			if TabButton.ImageLabel then
-				tween(TabButton.ImageLabel, {ImageColor3 = Color3.fromRGB(255,255,255)})
-			end
-			tween(TabButton, {BackgroundTransparency = 0})
+		if TabButton.ImageLabel then
+			tween(TabButton.ImageLabel, {ImageColor3 = Color3.fromRGB(255,255,255)})
+		end
+		tween(TabButton, {BackgroundTransparency = 0})
 			local buttonStroke = TabButton:FindFirstChildWhichIsA("UIStroke")
 			if buttonStroke then
 				tween(buttonStroke, {Transparency = 0.41})
@@ -1937,13 +1945,11 @@ FirstTab = false
 
 			Elements.UIPageLayout:JumpTo(TabPage)
 
-			task.wait(0.05)
-
-			for _, OtherTabButton in ipairs(Navigation.Tabs:GetChildren()) do
-				if OtherTabButton.Name ~= "InActive Template" and OtherTabButton.ClassName == "Frame" and OtherTabButton ~= TabButton then
-					if OtherTabButton.ImageLabel then
-						tween(OtherTabButton.ImageLabel, {ImageColor3 = Color3.fromRGB(221,221,221)})
-					end
+		for _, OtherTabButton in ipairs(Navigation.Tabs:GetChildren()) do
+			if OtherTabButton.Name ~= "InActive Template" and OtherTabButton.ClassName == "Frame" and OtherTabButton ~= TabButton then
+				if OtherTabButton.ImageLabel then
+					tween(OtherTabButton.ImageLabel, {ImageColor3 = Color3.fromRGB(221,221,221)})
+				end
 					tween(OtherTabButton, {BackgroundTransparency = 1})
 					local otherStroke = OtherTabButton:FindFirstChildWhichIsA("UIStroke")
 					if otherStroke then
@@ -1959,8 +1965,6 @@ FirstTab = false
 		if FirstTab then
 			Tab:Activate()
 		end
-
-		task.wait(0.01)
 
 		TabButton.Interact.MouseButton1Click:Connect(function()
 			Tab:Activate()
