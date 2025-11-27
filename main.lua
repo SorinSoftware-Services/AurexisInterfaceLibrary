@@ -937,6 +937,32 @@ if mainGradient then
 end
 Main.BackgroundColor3 = Color3.fromRGB(40, 38, 34)
 
+local function tintTopButton(btn, fill, stroke, iconColor)
+	if not btn then
+		return
+	end
+	if fill then
+		btn.BackgroundColor3 = fill
+	end
+	local strokeObj = btn:FindFirstChildWhichIsA("UIStroke")
+	if strokeObj and stroke then
+		strokeObj.Color = stroke
+		strokeObj.Transparency = 0.35
+	end
+	local icon = btn:FindFirstChildWhichIsA("ImageButton") or btn:FindFirstChildWhichIsA("ImageLabel")
+	if icon and iconColor then
+		icon.ImageColor3 = iconColor
+	end
+end
+
+local amberFill = Color3.fromRGB(230, 190, 105)
+local amberStroke = Color3.fromRGB(120, 105, 80)
+local iconLight = Color3.new(1, 1, 1)
+
+-- ensure both toggle buttons pick up the new warm accent (close stays default)
+tintTopButton(minimizeButton, amberFill, amberStroke, iconLight)
+tintTopButton(toggleSizeButton, amberFill, amberStroke, iconLight)
+
 if not minimizeButton and closeButton then
 	minimizeButton = closeButton:Clone()
 	minimizeButton.Name = "Minimize"
