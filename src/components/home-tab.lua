@@ -13,6 +13,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		GoodExecutors = {"Krnl", "Delta", "Wave", "Zenith", "Seliware", "Velocity", "Potassium", "Codex", "Volcano", "MacSploit", "Macsploit", "Bunni.lol", "Hydrogen", "Volt"},
 		BadExecutors = {"Solara", "Xeno"},
 		DetectedExecutors = {"Swift", "Valex", "Nucleus"},
+		EditionLabel = "Premium",
 		DiscordInvite = "XC5hpQQvMX" -- Only the invite code, not the full URL.
 	}, HomeTabSettings or {})
 
@@ -56,7 +57,12 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 	-- === UI SETUP ===
 	HomeTabPage.icon.ImageLabel.Image = Players:GetUserThumbnailAsync(Players.LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
 	HomeTabPage.player.user.RichText = true
-	HomeTabPage.player.user.Text = "You are using <b>" .. Release .. "</b>"
+	local editionLabel = HomeTabSettings.EditionLabel
+	if editionLabel and editionLabel ~= "" then
+		HomeTabPage.player.user.Text = string.format("Thanks for choosing <b>%s</b> - %s", Release, editionLabel)
+	else
+		HomeTabPage.player.user.Text = "You are using <b>" .. Release .. "</b>"
+	end
 
 	local function getGreeting()
 		local ok, now = pcall(os.date, "*t")
@@ -73,7 +79,8 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		end
 	end
 
-	HomeTabPage.player.Text.Text = string.format("%s, %s", getGreeting(), Players.LocalPlayer.DisplayName)
+	local displayName = Players.LocalPlayer.DisplayName or Players.LocalPlayer.Name or "there"
+	HomeTabPage.player.Text.Text = string.format("%s %s", getGreeting(), displayName)
 
 	local function setCardTextSizes(root, titleSize, valueSize, subtitleSize)
 		if not root then
@@ -126,16 +133,16 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		local color, message
 		if table.find(HomeTabSettings.GoodExecutors, exec) then
 			color = Color3.fromRGB(80, 255, 80)
-			message = "Good Executor. I think u can use all Scripts here."
+			message = "Great executor detected - premium scripts should run smoothly."
 		elseif table.find(HomeTabSettings.BadExecutors, exec) then
 			color = Color3.fromRGB(255, 180, 50)
-			message = "Weak executor. Some scripts will not work"
+			message = "Limited executor detected - some premium features may fail."
 		elseif table.find(HomeTabSettings.DetectedExecutors, exec) then
 			color = Color3.fromRGB(255, 60, 60)
-			message = "This executor is detected. Please don´t use them!"
+			message = "Executor is detected - avoid it to keep your account safe."
 		else
 			color = Color3.fromRGB(200, 200, 200)
-			message = "This executor isn't in my list. No idea if it's good or bad."
+			message = "Executor not recognized - premium compatibility unknown."
 		end
 
 		HomeTabPage.detailsholder.dashboard.Client.Subtitle.Text = message
