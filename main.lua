@@ -985,6 +985,7 @@ end
 Main.BackgroundColor3 = Color3.fromRGB(40, 38, 34)
 tintTopButton(minimizeButton, amberFill, amberStroke, iconLight)
 tintTopButton(toggleSizeButton, amberFill, amberStroke, iconLight)
+tintTopButton(closeButton, amberFill, amberStroke, iconLight)
 
 local orderedButtons = {}
 if minimizeButton then
@@ -1953,6 +1954,13 @@ FirstTab = false
 		TabPage.Title.Visible = TabSettings.ShowTitle
 		TabPage.Title.Text = TabSettings.Name
 		TabPage.Visible = true
+		-- warm, subtle background for tab content area
+		TabPage.BackgroundColor3 = Color3.fromRGB(34, 32, 28)
+		local tabStroke = TabPage:FindFirstChildWhichIsA("UIStroke")
+		if tabStroke then
+			tabStroke.Color = Color3.fromRGB(78, 72, 62)
+			tabStroke.Transparency = 0.5
+		end
 
 		Tab.Page = TabPage
 
