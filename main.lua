@@ -925,18 +925,6 @@ local closeButton = Controls and Controls:FindFirstChild("Close", true) or nil
 local toggleSizeButton = Controls and Controls:FindFirstChild("ToggleSize", true) or nil
 local minimizeButton = Controls and Controls:FindFirstChild("Minimize", true) or nil
 
--- Apply a subtle warm tint to the main background/gradient
-local warmGradient = ColorSequence.new({
-	ColorSequenceKeypoint.new(0, Color3.fromRGB(42, 40, 36)),
-	ColorSequenceKeypoint.new(0.6, Color3.fromRGB(66, 60, 52)),
-	ColorSequenceKeypoint.new(1, Color3.fromRGB(230, 190, 105)),
-})
-local mainGradient = Main:FindFirstChildWhichIsA("UIGradient") or Main:FindFirstChildWhichIsA("UIGradient", true)
-if mainGradient then
-	mainGradient.Color = warmGradient
-end
-Main.BackgroundColor3 = Color3.fromRGB(40, 38, 34)
-
 local function tintTopButton(btn, fill, stroke, iconColor)
 	if not btn then
 		return
@@ -958,10 +946,6 @@ end
 local amberFill = Color3.fromRGB(230, 190, 105)
 local amberStroke = Color3.fromRGB(120, 105, 80)
 local iconLight = Color3.new(1, 1, 1)
-
--- ensure both toggle buttons pick up the new warm accent (close stays default)
-tintTopButton(minimizeButton, amberFill, amberStroke, iconLight)
-tintTopButton(toggleSizeButton, amberFill, amberStroke, iconLight)
 
 if not minimizeButton and closeButton then
 	minimizeButton = closeButton:Clone()
@@ -987,6 +971,20 @@ if toggleSizeButton and not allowToggleButton then
 	toggleSizeButton.Visible = false
 	toggleSizeButton = nil
 end
+
+-- Apply a subtle warm tint to the main background/gradient and top buttons (after buttons exist)
+local warmGradient = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(42, 40, 36)),
+	ColorSequenceKeypoint.new(0.6, Color3.fromRGB(66, 60, 52)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(230, 190, 105)),
+})
+local mainGradient = Main:FindFirstChildWhichIsA("UIGradient") or Main:FindFirstChildWhichIsA("UIGradient", true)
+if mainGradient then
+	mainGradient.Color = warmGradient
+end
+Main.BackgroundColor3 = Color3.fromRGB(40, 38, 34)
+tintTopButton(minimizeButton, amberFill, amberStroke, iconLight)
+tintTopButton(toggleSizeButton, amberFill, amberStroke, iconLight)
 
 local orderedButtons = {}
 if minimizeButton then
