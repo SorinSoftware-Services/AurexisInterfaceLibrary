@@ -2096,9 +2096,14 @@ FirstTab = false
 
 	local function teardownCloseDialog()
 		if closeDialogState.scrollers then
-			for scroller, enabled in pairs(closeDialogState.scrollers) do
+			for scroller, state in pairs(closeDialogState.scrollers) do
 				if scroller and scroller.Parent then
-					scroller.ScrollingEnabled = enabled
+					if scroller:IsA("ScrollingFrame") then
+						scroller.ScrollingEnabled = state
+					elseif scroller:IsA("UIPageLayout") then
+						scroller.ScrollWheelEnabled = state.ScrollWheelEnabled
+						scroller.TouchEnabled = state.TouchEnabled
+					end
 				end
 			end
 		end
@@ -2122,6 +2127,15 @@ FirstTab = false
 				scrollers[descendant] = descendant.ScrollingEnabled
 				descendant.ScrollingEnabled = false
 			end
+		end
+
+		if Elements and Elements.UIPageLayout then
+			scrollers[Elements.UIPageLayout] = {
+				ScrollWheelEnabled = Elements.UIPageLayout.ScrollWheelEnabled,
+				TouchEnabled = Elements.UIPageLayout.TouchEnabled,
+			}
+			Elements.UIPageLayout.ScrollWheelEnabled = false
+			Elements.UIPageLayout.TouchEnabled = false
 		end
 
 		local host = Instance.new("Frame")
@@ -2342,7 +2356,7 @@ FirstTab = false
 
 		local targetSize = closeDialogState.targetSize or dialog.Size
 
-		tween(host, {BackgroundTransparency = 0.45})
+		tween(host, {BackgroundTransparency = 0.1})
 		tween(dialog, {Size = targetSize, BackgroundTransparency = 0.08})
 	end
 
