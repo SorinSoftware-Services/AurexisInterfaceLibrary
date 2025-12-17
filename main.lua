@@ -924,6 +924,7 @@ local Controls = Main.Controls
 local closeButton = Controls and Controls:FindFirstChild("Close", true) or nil
 local toggleSizeButton = Controls and Controls:FindFirstChild("ToggleSize", true) or nil
 local minimizeButton = Controls and Controls:FindFirstChild("Minimize", true) or nil
+local closeDialogState = {host = nil, page = nil, hidden = {}}
 
 if not minimizeButton and closeButton then
 	minimizeButton = closeButton:Clone()
@@ -1963,6 +1964,9 @@ FirstTab = false
 		task.wait(0.01)
 
 		TabButton.Interact.MouseButton1Click:Connect(function()
+			if closeDialogState and closeDialogState.host then
+				return
+			end
 			Tab:Activate()
 		end)
 
@@ -2065,7 +2069,7 @@ FirstTab = false
 		end
 	end
 
-	local closeDialogState = {
+	closeDialogState = {
 		host = nil,
 		page = nil,
 		hidden = {},
@@ -2115,17 +2119,17 @@ FirstTab = false
 		host.BorderSizePixel = 0
 		host.Size = UDim2.fromScale(1, 1)
 		host.Position = UDim2.fromScale(0, 0)
-		host.ZIndex = 80
+		host.ZIndex = 120
 		host.Active = true
 		host.Parent = page
 
 		local dialog = Instance.new("Frame")
 		dialog.Name = "Dialog"
 		dialog.AnchorPoint = Vector2.new(0.5, 0.5)
-		dialog.Position = UDim2.fromScale(0.5, 0.45)
-		dialog.Size = UDim2.fromOffset(360, 190)
-		dialog.BackgroundColor3 = Color3.fromRGB(20, 24, 32)
-		dialog.BackgroundTransparency = 0.02
+		dialog.Position = UDim2.fromScale(0.5, 0.46)
+		dialog.Size = UDim2.new(1, -40, 0, 210)
+		dialog.BackgroundColor3 = Main and Main.BackgroundColor3 or Color3.fromRGB(20, 24, 32)
+		dialog.BackgroundTransparency = 0.04
 		dialog.BorderSizePixel = 0
 		dialog.ZIndex = host.ZIndex + 1
 		dialog.Parent = host
@@ -2136,8 +2140,8 @@ FirstTab = false
 		dialogCorner.Parent = dialog
 
 		local dialogStroke = Instance.new("UIStroke")
-		dialogStroke.Color = Color3.fromRGB(90, 110, 150)
-		dialogStroke.Transparency = 0.25
+		dialogStroke.Color = Color3.fromRGB(110, 130, 170)
+		dialogStroke.Transparency = 0.3
 		dialogStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		dialogStroke.Parent = dialog
 
@@ -2145,16 +2149,16 @@ FirstTab = false
 		dialogGradient.Color = Aurexis.ThemeGradient
 		dialogGradient.Rotation = 90
 		dialogGradient.Transparency = NumberSequence.new{
-			NumberSequenceKeypoint.new(0, 0.7),
-			NumberSequenceKeypoint.new(1, 0.7),
+			NumberSequenceKeypoint.new(0, 0.8),
+			NumberSequenceKeypoint.new(1, 0.85),
 		}
 		dialogGradient.Parent = dialog
 
 		local title = Instance.new("TextLabel")
 		title.Name = "Title"
 		title.BackgroundTransparency = 1
-		title.Position = UDim2.new(0, 18, 0, 16)
-		title.Size = UDim2.new(1, -36, 0, 26)
+		title.Position = UDim2.new(0, 18, 0, 18)
+		title.Size = UDim2.new(1, -36, 0, 28)
 		title.Font = Enum.Font.GothamBold
 		title.Text = "Close window?"
 		title.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -2166,8 +2170,8 @@ FirstTab = false
 		local message = Instance.new("TextLabel")
 		message.Name = "Message"
 		message.BackgroundTransparency = 1
-		message.Position = UDim2.new(0, 18, 0, 48)
-		message.Size = UDim2.new(1, -36, 0, 46)
+		message.Position = UDim2.new(0, 18, 0, 54)
+		message.Size = UDim2.new(1, -36, 0, 64)
 		message.Font = Enum.Font.Gotham
 		message.Text = "Are you sure you want to close this window?"
 		message.TextColor3 = Color3.fromRGB(220, 224, 232)
@@ -2181,8 +2185,8 @@ FirstTab = false
 		local buttonRow = Instance.new("Frame")
 		buttonRow.Name = "Buttons"
 		buttonRow.BackgroundTransparency = 1
-		buttonRow.Position = UDim2.new(0, 18, 1, -62)
-		buttonRow.Size = UDim2.new(1, -36, 0, 42)
+		buttonRow.Position = UDim2.new(0, 18, 1, -70)
+		buttonRow.Size = UDim2.new(1, -36, 0, 48)
 		buttonRow.ZIndex = dialog.ZIndex + 1
 		buttonRow.Parent = dialog
 
@@ -2200,7 +2204,7 @@ FirstTab = false
 			btn.BackgroundColor3 = primary and Color3.fromRGB(86, 111, 255) or Color3.fromRGB(34, 38, 48)
 			btn.BackgroundTransparency = primary and 0 or 0.08
 			btn.BorderSizePixel = 0
-			btn.Size = UDim2.new(0, 130, 1, 0)
+			btn.Size = UDim2.new(0, 150, 1, 0)
 			btn.Font = Enum.Font.GothamMedium
 			btn.Text = text
 			btn.TextColor3 = Color3.fromRGB(255, 255, 255)
