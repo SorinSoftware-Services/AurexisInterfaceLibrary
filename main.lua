@@ -924,7 +924,7 @@ local Controls = Main.Controls
 local closeButton = Controls and Controls:FindFirstChild("Close", true) or nil
 local toggleSizeButton = Controls and Controls:FindFirstChild("ToggleSize", true) or nil
 local minimizeButton = Controls and Controls:FindFirstChild("Minimize", true) or nil
-local closeDialogState = {host = nil, page = nil, hidden = {}}
+local closeDialogState = {host = nil, dialog = nil, targetSize = nil}
 
 if not minimizeButton and closeButton then
 	minimizeButton = closeButton:Clone()
@@ -2071,107 +2071,142 @@ FirstTab = false
 
 	closeDialogState = {
 		host = nil,
-		page = nil,
-		hidden = {},
+		dialog = nil,
+		targetSize = nil,
 	}
 
-	local function teardownCloseDialog()
-		if closeDialogState.page and closeDialogState.hidden then
-			for child, wasVisible in pairs(closeDialogState.hidden) do
-				if child and child.Parent == closeDialogState.page then
-					child.Visible = wasVisible
-				end
+	local function getMainCornerRadius()
+		local defaultRadius = UDim.new(0, 12)
+		if Main then
+			local mainCorner = Main:FindFirstChildWhichIsA("UICorner")
+			if mainCorner then
+				return mainCorner.CornerRadius
 			end
 		end
+		return defaultRadius
+	end
+
+	local function applyRoundedCorner(target)
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = getMainCornerRadius()
+		corner.Parent = target
+		return corner
+	end
+
+	local function teardownCloseDialog()
 		if closeDialogState.host then
 			closeDialogState.host:Destroy()
 		end
-		closeDialogState = {host = nil, page = nil, hidden = {}}
+		closeDialogState = {host = nil, dialog = nil, targetSize = nil}
 	end
 
 	local function buildCloseDialog()
-		local page = nil
-		if Elements and Elements.UIPageLayout then
-			page = Elements.UIPageLayout.CurrentPage
-		end
-		if not page and Elements and Window.CurrentTab then
-			page = Elements:FindFirstChild(Window.CurrentTab)
-		end
-		page = page or Elements
-		if not page then
+		local container = Main or Elements
+		if not container then
 			return nil, nil
 		end
 
 		teardownCloseDialog()
 
-		local hidden = {}
-		for _, child in ipairs(page:GetChildren()) do
-			if child.Name ~= "CloseDialogHost" and not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
-				hidden[child] = child.Visible
-				child.Visible = false
-			end
-		end
-
 		local host = Instance.new("Frame")
 		host.Name = "CloseDialogHost"
-		host.BackgroundColor3 = Color3.new(0, 0, 0)
-		host.BackgroundTransparency = 0.35
+		host.BackgroundColor3 = Color3.fromRGB(6, 8, 14)
+		host.BackgroundTransparency = 1
 		host.BorderSizePixel = 0
 		host.Size = UDim2.fromScale(1, 1)
 		host.Position = UDim2.fromScale(0, 0)
-		host.ZIndex = 120
+		host.ZIndex = 250
 		host.Active = true
-		host.Parent = page
+		host.ClipsDescendants = true
+		host.Parent = container
+		applyRoundedCorner(host)
+
+		local scrim = Instance.new("UIGradient")
+		scrim.Color = ColorSequence.new{
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(16, 20, 30)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(6, 8, 14)),
+		}
+		scrim.Transparency = NumberSequence.new{
+			NumberSequenceKeypoint.new(0, 0.16),
+			NumberSequenceKeypoint.new(1, 0.34),
+		}
+		scrim.Rotation = 90
+		scrim.Parent = host
+
+		local vignette = Instance.new("ImageLabel")
+		vignette.Name = "Backdrop"
+		vignette.BackgroundTransparency = 1
+		vignette.AnchorPoint = Vector2.new(0.5, 0.5)
+		vignette.Position = UDim2.fromScale(0.5, 0.5)
+		vignette.Size = UDim2.new(1.08, 0, 1.08, 0)
+		vignette.Image = "rbxassetid://13160452170"
+		vignette.ImageColor3 = Color3.fromRGB(10, 14, 22)
+		vignette.ImageTransparency = 0.88
+		vignette.ScaleType = Enum.ScaleType.Slice
+		vignette.SliceCenter = Rect.new(60, 60, 60, 60)
+		vignette.ZIndex = host.ZIndex + 1
+		vignette.Parent = host
+
+		local dialogWidth = 420
+		if Main then
+			dialogWidth = math.clamp(Main.AbsoluteSize.X - 140, 320, 520)
+		end
 
 		local dialog = Instance.new("Frame")
 		dialog.Name = "Dialog"
 		dialog.AnchorPoint = Vector2.new(0.5, 0.5)
-		dialog.Position = UDim2.fromScale(0.5, 0.46)
-		dialog.Size = UDim2.new(1, -40, 0, 210)
+		dialog.Position = UDim2.fromScale(0.5, 0.5)
+		dialog.Size = UDim2.fromOffset(dialogWidth - 20, 204)
 		dialog.BackgroundColor3 = Main and Main.BackgroundColor3 or Color3.fromRGB(20, 24, 32)
-		dialog.BackgroundTransparency = 0.04
+		dialog.BackgroundTransparency = 0.22
 		dialog.BorderSizePixel = 0
-		dialog.ZIndex = host.ZIndex + 1
+		dialog.ZIndex = host.ZIndex + 2
+		dialog.ClipsDescendants = true
 		dialog.Parent = host
 		BlurModule(dialog)
-
-		local dialogCorner = Instance.new("UICorner")
-		dialogCorner.CornerRadius = UDim.new(0, 12)
-		dialogCorner.Parent = dialog
+		applyRoundedCorner(dialog)
 
 		local dialogStroke = Instance.new("UIStroke")
-		dialogStroke.Color = Color3.fromRGB(110, 130, 170)
-		dialogStroke.Transparency = 0.3
+		dialogStroke.Color = Color3.fromRGB(120, 138, 190)
+		dialogStroke.Transparency = 0.28
 		dialogStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		dialogStroke.Parent = dialog
 
 		local dialogGradient = Instance.new("UIGradient")
 		dialogGradient.Color = Aurexis.ThemeGradient
-		dialogGradient.Rotation = 90
+		dialogGradient.Rotation = 125
 		dialogGradient.Transparency = NumberSequence.new{
-			NumberSequenceKeypoint.new(0, 0.8),
-			NumberSequenceKeypoint.new(1, 0.85),
+			NumberSequenceKeypoint.new(0, 0.82),
+			NumberSequenceKeypoint.new(0.5, 0.9),
+			NumberSequenceKeypoint.new(1, 0.82),
 		}
 		dialogGradient.Parent = dialog
+
+		local padding = Instance.new("UIPadding")
+		padding.PaddingTop = UDim.new(0, 22)
+		padding.PaddingBottom = UDim.new(0, 22)
+		padding.PaddingLeft = UDim.new(0, 22)
+		padding.PaddingRight = UDim.new(0, 22)
+		padding.Parent = dialog
 
 		local title = Instance.new("TextLabel")
 		title.Name = "Title"
 		title.BackgroundTransparency = 1
-		title.Position = UDim2.new(0, 18, 0, 18)
-		title.Size = UDim2.new(1, -36, 0, 28)
+		title.Size = UDim2.new(1, 0, 0, 30)
 		title.Font = Enum.Font.GothamBold
 		title.Text = "Close window?"
 		title.TextColor3 = Color3.fromRGB(255, 255, 255)
 		title.TextSize = 20
 		title.TextXAlignment = Enum.TextXAlignment.Left
+		title.TextTransparency = 0
 		title.ZIndex = dialog.ZIndex + 1
 		title.Parent = dialog
 
 		local message = Instance.new("TextLabel")
 		message.Name = "Message"
 		message.BackgroundTransparency = 1
-		message.Position = UDim2.new(0, 18, 0, 54)
-		message.Size = UDim2.new(1, -36, 0, 64)
+		message.Position = UDim2.new(0, 0, 0, 34)
+		message.Size = UDim2.new(1, 0, 0, 64)
 		message.Font = Enum.Font.Gotham
 		message.Text = "Are you sure you want to close this window?"
 		message.TextColor3 = Color3.fromRGB(220, 224, 232)
@@ -2179,20 +2214,23 @@ FirstTab = false
 		message.TextWrapped = true
 		message.TextXAlignment = Enum.TextXAlignment.Left
 		message.TextYAlignment = Enum.TextYAlignment.Top
+		message.TextTransparency = 0
 		message.ZIndex = dialog.ZIndex + 1
 		message.Parent = dialog
 
 		local buttonRow = Instance.new("Frame")
 		buttonRow.Name = "Buttons"
+		buttonRow.AnchorPoint = Vector2.new(0.5, 1)
 		buttonRow.BackgroundTransparency = 1
-		buttonRow.Position = UDim2.new(0, 18, 1, -70)
-		buttonRow.Size = UDim2.new(1, -36, 0, 48)
+		buttonRow.Position = UDim2.new(0.5, 0, 1, -8)
+		buttonRow.Size = UDim2.new(1, 0, 0, 52)
 		buttonRow.ZIndex = dialog.ZIndex + 1
 		buttonRow.Parent = dialog
 
 		local buttonLayout = Instance.new("UIListLayout")
 		buttonLayout.FillDirection = Enum.FillDirection.Horizontal
 		buttonLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+		buttonLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 		buttonLayout.SortOrder = Enum.SortOrder.LayoutOrder
 		buttonLayout.Padding = UDim.new(0, 10)
 		buttonLayout.Parent = buttonRow
@@ -2201,26 +2239,36 @@ FirstTab = false
 			local btn = Instance.new("TextButton")
 			btn.Name = name
 			btn.AutoButtonColor = false
-			btn.BackgroundColor3 = primary and Color3.fromRGB(86, 111, 255) or Color3.fromRGB(34, 38, 48)
-			btn.BackgroundTransparency = primary and 0 or 0.08
+			btn.BackgroundColor3 = primary and Color3.fromRGB(70, 98, 255) or Color3.fromRGB(32, 36, 46)
+			btn.BackgroundTransparency = primary and 0 or 0.2
 			btn.BorderSizePixel = 0
-			btn.Size = UDim2.new(0, 150, 1, 0)
+			btn.Size = UDim2.new(0.5, -5, 1, 0)
 			btn.Font = Enum.Font.GothamMedium
 			btn.Text = text
 			btn.TextColor3 = Color3.fromRGB(255, 255, 255)
 			btn.TextSize = 16
+			btn.TextTransparency = 0
 			btn.ZIndex = dialog.ZIndex + 1
 			btn.Parent = buttonRow
 
-			local corner = Instance.new("UICorner")
-			corner.CornerRadius = UDim.new(0, 10)
-			corner.Parent = btn
+			applyRoundedCorner(btn)
 
 			local stroke = Instance.new("UIStroke")
 			stroke.Color = Color3.fromRGB(90, 110, 150)
-			stroke.Transparency = primary and 0.35 or 0.2
+			stroke.Transparency = primary and 0.32 or 0.2
 			stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 			stroke.Parent = btn
+
+			if primary then
+				local grad = Instance.new("UIGradient")
+				grad.Color = Aurexis.ThemeGradient
+				grad.Rotation = 20
+				grad.Transparency = NumberSequence.new{
+					NumberSequenceKeypoint.new(0, 0.05),
+					NumberSequenceKeypoint.new(1, 0.25),
+				}
+				grad.Parent = btn
+			end
 
 			return btn
 		end
@@ -2245,10 +2293,12 @@ FirstTab = false
 			Aurexis:Destroy()
 		end)
 
+		local targetSize = UDim2.fromOffset(dialogWidth, 220)
+
 		closeDialogState = {
 			host = host,
-			page = page,
-			hidden = hidden,
+			dialog = dialog,
+			targetSize = targetSize,
 		}
 
 		return host, dialog
@@ -2260,11 +2310,10 @@ FirstTab = false
 			return
 		end
 
-		host.BackgroundTransparency = 1
-		dialog.Size = UDim2.fromOffset(340, 170)
+		local targetSize = closeDialogState.targetSize or dialog.Size
 
-		tween(host, {BackgroundTransparency = 0.35})
-		tween(dialog, {Size = UDim2.fromOffset(360, 190)})
+		tween(host, {BackgroundTransparency = 0.28})
+		tween(dialog, {Size = targetSize, BackgroundTransparency = 0.08})
 	end
 
 	local minimizeIcon = getTopbarIcon(minimizeButton)
