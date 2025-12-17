@@ -2100,8 +2100,13 @@ FirstTab = false
 				if scroller and scroller.Parent then
 					if scroller:IsA("ScrollingFrame") then
 						scroller.ScrollingEnabled = state
-					elseif scroller:IsA("UIPageLayout") then
-						scroller.Enabled = state
+					elseif scroller:IsA("UIPageLayout") and type(state) == "table" then
+						if state.ScrollWheelInputEnabled ~= nil then
+							pcall(function() scroller.ScrollWheelInputEnabled = state.ScrollWheelInputEnabled end)
+						end
+						if state.SwipeEnabled ~= nil then
+							pcall(function() scroller.SwipeEnabled = state.SwipeEnabled end)
+						end
 					end
 				end
 			end
@@ -2129,8 +2134,22 @@ FirstTab = false
 		end
 
 		if Elements and Elements.UIPageLayout then
-			scrollers[Elements.UIPageLayout] = Elements.UIPageLayout.Enabled
-			Elements.UIPageLayout.Enabled = false
+			local pageLayout = Elements.UIPageLayout
+			local originalStates = {}
+
+			local s_sw, r_sw = pcall(function() return pageLayout.ScrollWheelInputEnabled end)
+			if s_sw then
+				originalStates.ScrollWheelInputEnabled = r_sw
+				pcall(function() pageLayout.ScrollWheelInputEnabled = false end)
+			end
+
+			local s_se, r_se = pcall(function() return pageLayout.SwipeEnabled end)
+			if s_se then
+				originalStates.SwipeEnabled = r_se
+				pcall(function() pageLayout.SwipeEnabled = false end)
+			end
+
+			scrollers[pageLayout] = originalStates
 		end
 
 		local host = Instance.new("Frame")
