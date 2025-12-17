@@ -2136,7 +2136,6 @@ FirstTab = false
 		host.ClipsDescendants = true
 		host.Parent = container
 		applyRoundedCorner(host)
-		BlurModule(host)
 
 		local scrim = Instance.new("UIGradient")
 		scrim.Color = ColorSequence.new{
@@ -2144,11 +2143,25 @@ FirstTab = false
 			ColorSequenceKeypoint.new(1, Color3.fromRGB(6, 8, 14)),
 		}
 		scrim.Transparency = NumberSequence.new{
-			NumberSequenceKeypoint.new(0, 0.16),
-			NumberSequenceKeypoint.new(1, 0.34),
+			NumberSequenceKeypoint.new(0, 0.08),
+			NumberSequenceKeypoint.new(1, 0.2),
 		}
 		scrim.Rotation = 90
 		scrim.Parent = host
+
+		local grain = Instance.new("ImageLabel")
+		grain.Name = "OverlayNoise"
+		grain.BackgroundTransparency = 1
+		grain.AnchorPoint = Vector2.new(0.5, 0.5)
+		grain.Position = UDim2.fromScale(0.5, 0.5)
+		grain.Size = UDim2.new(1.04, 0, 1.04, 0)
+		grain.Image = "rbxassetid://13160452170"
+		grain.ImageColor3 = Color3.fromRGB(12, 16, 24)
+		grain.ImageTransparency = 0.77
+		grain.ScaleType = Enum.ScaleType.Slice
+		grain.SliceCenter = Rect.new(60, 60, 60, 60)
+		grain.ZIndex = host.ZIndex + 1
+		grain.Parent = host
 
 		local vignette = Instance.new("ImageLabel")
 		vignette.Name = "Backdrop"
@@ -2180,7 +2193,6 @@ FirstTab = false
 		dialog.ZIndex = host.ZIndex + 2
 		dialog.ClipsDescendants = true
 		dialog.Parent = host
-		BlurModule(dialog)
 		applyRoundedCorner(dialog)
 
 		local dialogStroke = Instance.new("UIStroke")
@@ -2330,7 +2342,7 @@ FirstTab = false
 
 		local targetSize = closeDialogState.targetSize or dialog.Size
 
-		tween(host, {BackgroundTransparency = 0.12})
+		tween(host, {BackgroundTransparency = 0.45})
 		tween(dialog, {Size = targetSize, BackgroundTransparency = 0.08})
 	end
 
