@@ -34,9 +34,9 @@ by Nebula Softworks
 
 
 
-local BASE_URL = "https://raw.githubusercontent.com/SorinSoftware-Services/AurexisInterfaceLibrary/main"
+local BASE_URL = "https://raw.githubusercontent.com/SorinSoftware-Services/AurexisInterfaceLibrary/main/"
 
-local Release = "Pre Release [v 0.1.3]"
+local Release = "Pre Release [v 0.2.3]"
 
 local Aurexis = { 
 	Folder = "AurexisLibrary UI", 
@@ -119,8 +119,11 @@ local compatibilityPlaces = {
 
 local compatibilityUniverses = {
 	[5650396773] = true, -- a dusty trip universe
+	[3989869156] = true, -- ANTS WAR
+	[111958650] = true,  -- Arsenal
 	[7848646653] = true, -- Break your Bones
 	[6401952734] = true, -- PETS GO!
+	[6035872082] = true, --RIVALS
 }
 
 if compatibilityPlaces[game.PlaceId] or compatibilityUniverses[game.GameId] then

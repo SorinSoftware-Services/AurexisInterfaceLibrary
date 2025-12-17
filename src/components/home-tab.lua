@@ -10,7 +10,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 
 	HomeTabSettings = Kwargify({
 		Icon = 1,
-		GoodExecutors = {"Krnl", "Delta", "Wave", "Zenith", "Seliware", "Velocity", "Potassium", "Codex", "Volcano", "MacSploit", "Bunni.lol"},
+		GoodExecutors = {"Krnl", "Delta", "Wave", "Zenith", "Seliware", "Velocity", "Potassium", "Codex", "Volcano", "MacSploit", "Macsploit", "Bunni.lol", "Hydrogen", "Volt"},
 		BadExecutors = {"Solara", "Xeno"},
 		DetectedExecutors = {"Swift", "Valex", "Nucleus"},
 		DiscordInvite = "XC5hpQQvMX" -- Only the invite code, not the full URL.
@@ -117,7 +117,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 	end
 
 	local exec = (isStudio and "Studio (Debug)" or identifyexecutor()) or "Unknown"
-	HomeTabPage.detailsholder.dashboard.Client.Title.Text =  exec .. " User"
+	HomeTabPage.detailsholder.dashboard.Client.Title.Text =  "You are using " .. exec
 
 	if isStudio then
 		HomeTabPage.detailsholder.dashboard.Client.Subtitle.Text = "Aurexis Interface Library - Debugging Mode"
@@ -129,10 +129,10 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			message = "Good Executor. I think u can use all Scripts here."
 		elseif table.find(HomeTabSettings.BadExecutors, exec) then
 			color = Color3.fromRGB(255, 180, 50)
-			message = "Bad Exec :( | Scripts my be not Supported"
+			message = "Weak executor. Some scripts will not work"
 		elseif table.find(HomeTabSettings.DetectedExecutors, exec) then
 			color = Color3.fromRGB(255, 60, 60)
-			message = "This executor is detected. Why the shit would you use this?!"
+			message = "This executor is detected. Please don´t use them!"
 		else
 			color = Color3.fromRGB(200, 200, 200)
 			message = "This executor isn't in my list. No idea if it's good or bad."
