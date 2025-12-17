@@ -36,7 +36,7 @@ by Nebula Softworks
 
 local BASE_URL = "https://raw.githubusercontent.com/SorinSoftware-Services/AurexisInterfaceLibrary/main/"
 
-local Release = "Pre Release [v 0.2.1]"
+local Release = "Pre Release [v 0.2.6]"
 
 local Aurexis = { 
 	Folder = "AurexisLibrary UI", 
@@ -2199,7 +2199,7 @@ FirstTab = false
 		vignette.Size = UDim2.new(1.08, 0, 1.08, 0)
 		vignette.Image = "rbxassetid://13160452170"
 		vignette.ImageColor3 = Color3.fromRGB(10, 14, 22)
-		vignette.ImageTransparency = 0.88
+		vignette.ImageTransparency = 0.94
 		vignette.ScaleType = Enum.ScaleType.Slice
 		vignette.SliceCenter = Rect.new(60, 60, 60, 60)
 		vignette.ZIndex = host.ZIndex + 1
