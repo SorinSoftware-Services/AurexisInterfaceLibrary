@@ -2101,8 +2101,7 @@ FirstTab = false
 					if scroller:IsA("ScrollingFrame") then
 						scroller.ScrollingEnabled = state
 					elseif scroller:IsA("UIPageLayout") then
-						scroller.ScrollWheelEnabled = state.ScrollWheelEnabled
-						scroller.TouchEnabled = state.TouchEnabled
+						scroller.Enabled = state
 					end
 				end
 			end
@@ -2130,12 +2129,8 @@ FirstTab = false
 		end
 
 		if Elements and Elements.UIPageLayout then
-			scrollers[Elements.UIPageLayout] = {
-				ScrollWheelEnabled = Elements.UIPageLayout.ScrollWheelEnabled,
-				TouchEnabled = Elements.UIPageLayout.TouchEnabled,
-			}
-			Elements.UIPageLayout.ScrollWheelEnabled = false
-			Elements.UIPageLayout.TouchEnabled = false
+			scrollers[Elements.UIPageLayout] = Elements.UIPageLayout.Enabled
+			Elements.UIPageLayout.Enabled = false
 		end
 
 		local host = Instance.new("Frame")
