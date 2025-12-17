@@ -924,7 +924,7 @@ local Controls = Main.Controls
 local closeButton = Controls and Controls:FindFirstChild("Close", true) or nil
 local toggleSizeButton = Controls and Controls:FindFirstChild("ToggleSize", true) or nil
 local minimizeButton = Controls and Controls:FindFirstChild("Minimize", true) or nil
-local closeDialogState = {host = nil, dialog = nil, targetSize = nil}
+local closeDialogState = {host = nil, dialog = nil, targetSize = nil, scrollers = {}}
 
 if not minimizeButton and closeButton then
 	minimizeButton = closeButton:Clone()
@@ -2073,6 +2073,7 @@ FirstTab = false
 		host = nil,
 		dialog = nil,
 		targetSize = nil,
+		scrollers = {},
 	}
 
 	local function getMainCornerRadius()
@@ -2094,10 +2095,17 @@ FirstTab = false
 	end
 
 	local function teardownCloseDialog()
+		if closeDialogState.scrollers then
+			for scroller, enabled in pairs(closeDialogState.scrollers) do
+				if scroller and scroller.Parent then
+					scroller.ScrollingEnabled = enabled
+				end
+			end
+		end
 		if closeDialogState.host then
 			closeDialogState.host:Destroy()
 		end
-		closeDialogState = {host = nil, dialog = nil, targetSize = nil}
+		closeDialogState = {host = nil, dialog = nil, targetSize = nil, scrollers = {}}
 	end
 
 	local function buildCloseDialog()
@@ -2107,6 +2115,14 @@ FirstTab = false
 		end
 
 		teardownCloseDialog()
+
+		local scrollers = {}
+		for _, descendant in ipairs(container:GetDescendants()) do
+			if descendant:IsA("ScrollingFrame") then
+				scrollers[descendant] = descendant.ScrollingEnabled
+				descendant.ScrollingEnabled = false
+			end
+		end
 
 		local host = Instance.new("Frame")
 		host.Name = "CloseDialogHost"
@@ -2120,6 +2136,7 @@ FirstTab = false
 		host.ClipsDescendants = true
 		host.Parent = container
 		applyRoundedCorner(host)
+		BlurModule(host)
 
 		local scrim = Instance.new("UIGradient")
 		scrim.Color = ColorSequence.new{
@@ -2299,6 +2316,7 @@ FirstTab = false
 			host = host,
 			dialog = dialog,
 			targetSize = targetSize,
+			scrollers = scrollers,
 		}
 
 		return host, dialog
@@ -2312,7 +2330,7 @@ FirstTab = false
 
 		local targetSize = closeDialogState.targetSize or dialog.Size
 
-		tween(host, {BackgroundTransparency = 0.28})
+		tween(host, {BackgroundTransparency = 0.12})
 		tween(dialog, {Size = targetSize, BackgroundTransparency = 0.08})
 	end
 
