@@ -36,7 +36,7 @@ by Nebula Softworks
 
 local BASE_URL = "https://raw.githubusercontent.com/SorinSoftware-Services/AurexisInterfaceLibrary/main/"
 
-local Release = "Pre Release [v 0.2.3]"
+local Release = "Pre Release [v 0.2.1]"
 
 local Aurexis = { 
 	Folder = "AurexisLibrary UI", 
@@ -2065,6 +2065,185 @@ FirstTab = false
 		end
 	end
 
+	local closeConfirmationOverlay
+	local closeConfirmationDialog
+
+	local function hideCloseConfirmation()
+		if not (closeConfirmationOverlay and closeConfirmationOverlay.Visible) then
+			return
+		end
+
+		tween(closeConfirmationOverlay, {BackgroundTransparency = 1}, function()
+			if closeConfirmationOverlay then
+				closeConfirmationOverlay.Visible = false
+			end
+		end)
+		if closeConfirmationDialog then
+			tween(closeConfirmationDialog, {Size = UDim2.fromOffset(340, 170)})
+		end
+	end
+
+	local function ensureCloseConfirmation()
+		if closeConfirmationOverlay and closeConfirmationOverlay.Parent then
+			return closeConfirmationOverlay, closeConfirmationDialog
+		end
+
+		local overlay = Instance.new("Frame")
+		overlay.Name = "CloseConfirmation"
+		overlay.BackgroundColor3 = Color3.new(0, 0, 0)
+		overlay.BackgroundTransparency = 0.45
+		overlay.BorderSizePixel = 0
+		overlay.Size = UDim2.fromScale(1, 1)
+		overlay.Visible = false
+		overlay.ZIndex = 100
+		overlay.Active = true
+		overlay.Parent = AurexisUI
+
+		local dialog = Instance.new("Frame")
+		dialog.Name = "Dialog"
+		dialog.AnchorPoint = Vector2.new(0.5, 0.5)
+		dialog.Position = UDim2.fromScale(0.5, 0.5)
+		dialog.Size = UDim2.fromOffset(360, 190)
+		dialog.BackgroundColor3 = Color3.fromRGB(18, 22, 30)
+		dialog.BackgroundTransparency = 0.05
+		dialog.BorderSizePixel = 0
+		dialog.ZIndex = overlay.ZIndex + 1
+		dialog.Parent = overlay
+		BlurModule(dialog)
+
+		local dialogCorner = Instance.new("UICorner")
+		dialogCorner.CornerRadius = UDim.new(0, 12)
+		dialogCorner.Parent = dialog
+
+		local dialogStroke = Instance.new("UIStroke")
+		dialogStroke.Color = Color3.fromRGB(110, 130, 170)
+		dialogStroke.Transparency = 0.35
+		dialogStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		dialogStroke.Parent = dialog
+
+		local dialogGradient = Instance.new("UIGradient")
+		dialogGradient.Color = Aurexis.ThemeGradient
+		dialogGradient.Rotation = 90
+		dialogGradient.Transparency = NumberSequence.new{
+			NumberSequenceKeypoint.new(0, 0.7),
+			NumberSequenceKeypoint.new(1, 0.7),
+		}
+		dialogGradient.Parent = dialog
+
+		local title = Instance.new("TextLabel")
+		title.Name = "Title"
+		title.BackgroundTransparency = 1
+		title.Position = UDim2.new(0, 18, 0, 16)
+		title.Size = UDim2.new(1, -36, 0, 26)
+		title.Font = Enum.Font.GothamBold
+		title.Text = "You are sure to clo"
+		title.TextColor3 = Color3.fromRGB(255, 255, 255)
+		title.TextSize = 20
+		title.TextXAlignment = Enum.TextXAlignment.Left
+		title.ZIndex = dialog.ZIndex + 1
+		title.Parent = dialog
+
+		local message = Instance.new("TextLabel")
+		message.Name = "Message"
+		message.BackgroundTransparency = 1
+		message.Position = UDim2.new(0, 18, 0, 48)
+		message.Size = UDim2.new(1, -36, 0, 46)
+		message.Font = Enum.Font.Gotham
+		message.Text = "Do you want to close SorinScript Hub?"
+		message.TextColor3 = Color3.fromRGB(220, 224, 232)
+		message.TextSize = 15
+		message.TextWrapped = true
+		message.TextXAlignment = Enum.TextXAlignment.Left
+		message.TextYAlignment = Enum.TextYAlignment.Top
+		message.ZIndex = dialog.ZIndex + 1
+		message.Parent = dialog
+
+		local buttonRow = Instance.new("Frame")
+		buttonRow.Name = "Buttons"
+		buttonRow.BackgroundTransparency = 1
+		buttonRow.Position = UDim2.new(0, 18, 1, -62)
+		buttonRow.Size = UDim2.new(1, -36, 0, 42)
+		buttonRow.ZIndex = dialog.ZIndex + 1
+		buttonRow.Parent = dialog
+
+		local buttonLayout = Instance.new("UIListLayout")
+		buttonLayout.FillDirection = Enum.FillDirection.Horizontal
+		buttonLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+		buttonLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		buttonLayout.Padding = UDim.new(0, 10)
+		buttonLayout.Parent = buttonRow
+
+		local function makeButton(name, text, primary)
+			local btn = Instance.new("TextButton")
+			btn.Name = name
+			btn.AutoButtonColor = false
+			btn.BackgroundColor3 = primary and Color3.fromRGB(86, 111, 255) or Color3.fromRGB(40, 46, 60)
+			btn.BackgroundTransparency = primary and 0 or 0.05
+			btn.BorderSizePixel = 0
+			btn.Size = UDim2.new(0, 130, 1, 0)
+			btn.Font = Enum.Font.GothamMedium
+			btn.Text = text
+			btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+			btn.TextSize = 16
+			btn.ZIndex = dialog.ZIndex + 1
+			btn.Parent = buttonRow
+
+			local corner = Instance.new("UICorner")
+			corner.CornerRadius = UDim.new(0, 10)
+			corner.Parent = btn
+
+			local stroke = Instance.new("UIStroke")
+			stroke.Color = Color3.fromRGB(110, 130, 170)
+			stroke.Transparency = primary and 0.4 or 0.15
+			stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+			stroke.Parent = btn
+
+			return btn
+		end
+
+		local cancelButton = makeButton("Cancel", "Cancel", false)
+		cancelButton.LayoutOrder = 1
+
+		local confirmButton = makeButton("Confirm", "Confirm", true)
+		confirmButton.LayoutOrder = 2
+
+		cancelButton.MouseButton1Click:Connect(function()
+			hideCloseConfirmation()
+		end)
+
+		confirmButton.MouseButton1Click:Connect(function()
+			hideCloseConfirmation()
+			Window.State = true
+			if dragBar then
+				dragBar.Visible = false
+			end
+			setMobileInputBlocked(false)
+			Aurexis:Destroy()
+		end)
+
+		closeConfirmationOverlay = overlay
+		closeConfirmationDialog = dialog
+
+		return closeConfirmationOverlay, closeConfirmationDialog
+	end
+
+	local function showCloseConfirmation()
+		local overlay, dialog = ensureCloseConfirmation()
+		if not (overlay and dialog) then
+			return
+		end
+		if overlay.Visible then
+			return
+		end
+
+		overlay.BackgroundTransparency = 1
+		dialog.Size = UDim2.fromOffset(340, 170)
+
+		overlay.Visible = true
+		tween(overlay, {BackgroundTransparency = 0.45})
+		tween(dialog, {Size = UDim2.fromOffset(360, 190)})
+	end
+
 	local minimizeIcon = getTopbarIcon(minimizeButton)
 	if minimizeButton and minimizeIcon then
 		minimizeIcon.MouseButton1Click:Connect(function()
@@ -2081,12 +2260,7 @@ FirstTab = false
 	local closeIcon = getTopbarIcon(closeButton)
 	if closeButton and closeIcon then
 		closeIcon.MouseButton1Click:Connect(function()
-			Window.State = true
-			if dragBar then
-				dragBar.Visible = false
-			end
-			setMobileInputBlocked(false)
-			Aurexis:Destroy()
+			showCloseConfirmation()
 		end)
 		closeButton.MouseEnter:Connect(function()
 			tween(closeIcon, {ImageColor3 = Color3.new(1, 1, 1)})
