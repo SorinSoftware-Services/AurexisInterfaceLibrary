@@ -36,7 +36,7 @@ by Nebula Softworks
 
 local BASE_URL = "https://raw.githubusercontent.com/SorinSoftware-Services/AurexisInterfaceLibrary/main/"
 
-local Release = "Pre Release [v 0.2.3]"
+local Release = "Pre Release [v 0.2.6]"
 
 local Aurexis = { 
 	Folder = "AurexisLibrary UI", 
@@ -924,6 +924,7 @@ local Controls = Main.Controls
 local closeButton = Controls and Controls:FindFirstChild("Close", true) or nil
 local toggleSizeButton = Controls and Controls:FindFirstChild("ToggleSize", true) or nil
 local minimizeButton = Controls and Controls:FindFirstChild("Minimize", true) or nil
+local closeDialogState = {host = nil, dialog = nil, targetSize = nil, scrollers = {}}
 
 if not minimizeButton and closeButton then
 	minimizeButton = closeButton:Clone()
@@ -1963,6 +1964,9 @@ FirstTab = false
 		task.wait(0.01)
 
 		TabButton.Interact.MouseButton1Click:Connect(function()
+			if closeDialogState and closeDialogState.host then
+				return
+			end
 			Tab:Activate()
 		end)
 
@@ -2065,6 +2069,305 @@ FirstTab = false
 		end
 	end
 
+	closeDialogState = {
+		host = nil,
+		dialog = nil,
+		targetSize = nil,
+		scrollers = {},
+	}
+
+	local function getMainCornerRadius()
+		local defaultRadius = UDim.new(0, 12)
+		if Main then
+			local mainCorner = Main:FindFirstChildWhichIsA("UICorner")
+			if mainCorner then
+				return mainCorner.CornerRadius
+			end
+		end
+		return defaultRadius
+	end
+
+	local function applyRoundedCorner(target)
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = getMainCornerRadius()
+		corner.Parent = target
+		return corner
+	end
+
+	local function teardownCloseDialog()
+		if closeDialogState.scrollers then
+			for scroller, state in pairs(closeDialogState.scrollers) do
+				if scroller and scroller.Parent then
+					if scroller:IsA("ScrollingFrame") then
+						scroller.ScrollingEnabled = state
+					elseif scroller:IsA("UIPageLayout") and type(state) == "table" then
+						if state.ScrollWheelInputEnabled ~= nil then
+							pcall(function() scroller.ScrollWheelInputEnabled = state.ScrollWheelInputEnabled end)
+						end
+						if state.SwipeEnabled ~= nil then
+							pcall(function() scroller.SwipeEnabled = state.SwipeEnabled end)
+						end
+					end
+				end
+			end
+		end
+		if closeDialogState.host then
+			closeDialogState.host:Destroy()
+		end
+		closeDialogState = {host = nil, dialog = nil, targetSize = nil, scrollers = {}}
+	end
+
+	local function buildCloseDialog()
+		local container = Main or Elements
+		if not container then
+			return nil, nil
+		end
+
+		teardownCloseDialog()
+
+		local scrollers = {}
+		for _, descendant in ipairs(container:GetDescendants()) do
+			if descendant:IsA("ScrollingFrame") then
+				scrollers[descendant] = descendant.ScrollingEnabled
+				descendant.ScrollingEnabled = false
+			end
+		end
+
+		if Elements and Elements.UIPageLayout then
+			local pageLayout = Elements.UIPageLayout
+			local originalStates = {}
+
+			local s_sw, r_sw = pcall(function() return pageLayout.ScrollWheelInputEnabled end)
+			if s_sw then
+				originalStates.ScrollWheelInputEnabled = r_sw
+				pcall(function() pageLayout.ScrollWheelInputEnabled = false end)
+			end
+
+			local s_se, r_se = pcall(function() return pageLayout.SwipeEnabled end)
+			if s_se then
+				originalStates.SwipeEnabled = r_se
+				pcall(function() pageLayout.SwipeEnabled = false end)
+			end
+
+			scrollers[pageLayout] = originalStates
+		end
+
+		local host = Instance.new("Frame")
+		host.Name = "CloseDialogHost"
+		host.BackgroundColor3 = Color3.fromRGB(6, 8, 14)
+		host.BackgroundTransparency = 1
+		host.BorderSizePixel = 0
+		host.Size = UDim2.fromScale(1, 1)
+		host.Position = UDim2.fromScale(0, 0)
+		host.ZIndex = 250
+		host.Active = true
+		host.ClipsDescendants = true
+		host.Parent = container
+		applyRoundedCorner(host)
+
+		local scrim = Instance.new("UIGradient")
+		scrim.Color = ColorSequence.new{
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(16, 20, 30)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(6, 8, 14)),
+		}
+		scrim.Transparency = NumberSequence.new{
+			NumberSequenceKeypoint.new(0, 0.08),
+			NumberSequenceKeypoint.new(1, 0.2),
+		}
+		scrim.Rotation = 90
+		scrim.Parent = host
+
+		local grain = Instance.new("ImageLabel")
+		grain.Name = "OverlayNoise"
+		grain.BackgroundTransparency = 1
+		grain.AnchorPoint = Vector2.new(0.5, 0.5)
+		grain.Position = UDim2.fromScale(0.5, 0.5)
+		grain.Size = UDim2.new(1.04, 0, 1.04, 0)
+		grain.Image = "rbxassetid://13160452170"
+		grain.ImageColor3 = Color3.fromRGB(12, 16, 24)
+		grain.ImageTransparency = 0.77
+		grain.ScaleType = Enum.ScaleType.Slice
+		grain.SliceCenter = Rect.new(60, 60, 60, 60)
+		grain.ZIndex = host.ZIndex + 1
+		grain.Parent = host
+
+		local vignette = Instance.new("ImageLabel")
+		vignette.Name = "Backdrop"
+		vignette.BackgroundTransparency = 1
+		vignette.AnchorPoint = Vector2.new(0.5, 0.5)
+		vignette.Position = UDim2.fromScale(0.5, 0.5)
+		vignette.Size = UDim2.new(1.08, 0, 1.08, 0)
+		vignette.Image = "rbxassetid://13160452170"
+		vignette.ImageColor3 = Color3.fromRGB(10, 14, 22)
+		vignette.ImageTransparency = 0.94
+		vignette.ScaleType = Enum.ScaleType.Slice
+		vignette.SliceCenter = Rect.new(60, 60, 60, 60)
+		vignette.ZIndex = host.ZIndex + 1
+		vignette.Parent = host
+
+		local dialogWidth = 420
+		if Main then
+			dialogWidth = math.clamp(Main.AbsoluteSize.X - 140, 320, 520)
+		end
+
+		local dialog = Instance.new("Frame")
+		dialog.Name = "Dialog"
+		dialog.AnchorPoint = Vector2.new(0.5, 0.5)
+		dialog.Position = UDim2.fromScale(0.5, 0.5)
+		dialog.Size = UDim2.fromOffset(dialogWidth - 20, 204)
+		dialog.BackgroundColor3 = Main and Main.BackgroundColor3 or Color3.fromRGB(20, 24, 32)
+		dialog.BackgroundTransparency = 0.22
+		dialog.BorderSizePixel = 0
+		dialog.ZIndex = host.ZIndex + 2
+		dialog.ClipsDescendants = true
+		dialog.Parent = host
+		applyRoundedCorner(dialog)
+
+		local dialogGradient = Instance.new("UIGradient")
+		dialogGradient.Color = Aurexis.ThemeGradient
+		dialogGradient.Rotation = 125
+		dialogGradient.Transparency = NumberSequence.new{
+			NumberSequenceKeypoint.new(0, 0.82),
+			NumberSequenceKeypoint.new(0.5, 0.9),
+			NumberSequenceKeypoint.new(1, 0.82),
+		}
+		dialogGradient.Parent = dialog
+
+		local padding = Instance.new("UIPadding")
+		padding.PaddingTop = UDim.new(0, 22)
+		padding.PaddingBottom = UDim.new(0, 22)
+		padding.PaddingLeft = UDim.new(0, 22)
+		padding.PaddingRight = UDim.new(0, 22)
+		padding.Parent = dialog
+
+		local title = Instance.new("TextLabel")
+		title.Name = "Title"
+		title.BackgroundTransparency = 1
+		title.Size = UDim2.new(1, 0, 0, 30)
+		title.Font = Enum.Font.GothamBold
+		title.Text = "Close window?"
+		title.TextColor3 = Color3.fromRGB(255, 255, 255)
+		title.TextSize = 20
+		title.TextXAlignment = Enum.TextXAlignment.Left
+		title.TextTransparency = 0
+		title.ZIndex = dialog.ZIndex + 1
+		title.Parent = dialog
+
+		local message = Instance.new("TextLabel")
+		message.Name = "Message"
+		message.BackgroundTransparency = 1
+		message.Position = UDim2.new(0, 0, 0, 34)
+		message.Size = UDim2.new(1, 0, 0, 64)
+		message.Font = Enum.Font.Gotham
+		message.Text = "Are you sure you want to close this window?"
+		message.TextColor3 = Color3.fromRGB(220, 224, 232)
+		message.TextSize = 15
+		message.TextWrapped = true
+		message.TextXAlignment = Enum.TextXAlignment.Left
+		message.TextYAlignment = Enum.TextYAlignment.Top
+		message.TextTransparency = 0
+		message.ZIndex = dialog.ZIndex + 1
+		message.Parent = dialog
+
+		local buttonRow = Instance.new("Frame")
+		buttonRow.Name = "Buttons"
+		buttonRow.AnchorPoint = Vector2.new(0.5, 1)
+		buttonRow.BackgroundTransparency = 1
+		buttonRow.Position = UDim2.new(0.5, 0, 1, -8)
+		buttonRow.Size = UDim2.new(1, 0, 0, 52)
+		buttonRow.ZIndex = dialog.ZIndex + 1
+		buttonRow.Parent = dialog
+
+		local buttonLayout = Instance.new("UIListLayout")
+		buttonLayout.FillDirection = Enum.FillDirection.Horizontal
+		buttonLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+		buttonLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+		buttonLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		buttonLayout.Padding = UDim.new(0, 10)
+		buttonLayout.Parent = buttonRow
+
+		local function makeButton(name, text, primary)
+			local btn = Instance.new("TextButton")
+			btn.Name = name
+			btn.AutoButtonColor = false
+			btn.BackgroundColor3 = primary and Color3.fromRGB(70, 98, 255) or Color3.fromRGB(32, 36, 46)
+			btn.BackgroundTransparency = primary and 0 or 0.2
+			btn.BorderSizePixel = 0
+			btn.Size = UDim2.new(0.5, -5, 1, 0)
+			btn.Font = Enum.Font.GothamMedium
+			btn.Text = text
+			btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+			btn.TextSize = 16
+			btn.TextTransparency = 0
+			btn.ZIndex = dialog.ZIndex + 1
+			btn.Parent = buttonRow
+
+			applyRoundedCorner(btn)
+
+			local stroke = Instance.new("UIStroke")
+			stroke.Color = Color3.fromRGB(90, 110, 150)
+			stroke.Transparency = primary and 0.32 or 0.2
+			stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+			stroke.Parent = btn
+
+			if primary then
+				local grad = Instance.new("UIGradient")
+				grad.Color = Aurexis.ThemeGradient
+				grad.Rotation = 20
+				grad.Transparency = NumberSequence.new{
+					NumberSequenceKeypoint.new(0, 0.05),
+					NumberSequenceKeypoint.new(1, 0.25),
+				}
+				grad.Parent = btn
+			end
+
+			return btn
+		end
+
+		local cancelButton = makeButton("Cancel", "Cancel", false)
+		cancelButton.LayoutOrder = 1
+
+		local confirmButton = makeButton("Confirm", "Close", true)
+		confirmButton.LayoutOrder = 2
+
+		cancelButton.MouseButton1Click:Connect(function()
+			teardownCloseDialog()
+		end)
+
+		confirmButton.MouseButton1Click:Connect(function()
+			teardownCloseDialog()
+			Window.State = true
+			if dragBar then
+				dragBar.Visible = false
+			end
+			setMobileInputBlocked(false)
+			Aurexis:Destroy()
+		end)
+
+		local targetSize = UDim2.fromOffset(dialogWidth, 220)
+
+		closeDialogState = {
+			host = host,
+			dialog = dialog,
+			targetSize = targetSize,
+			scrollers = scrollers,
+		}
+
+		return host, dialog
+	end
+
+	local function showCloseConfirmation()
+		local host, dialog = buildCloseDialog()
+		if not (host and dialog) then
+			return
+		end
+
+		local targetSize = closeDialogState.targetSize or dialog.Size
+
+		tween(host, {BackgroundTransparency = 0.05})
+		tween(dialog, {Size = targetSize, BackgroundTransparency = 0.05})
+	end
+
 	local minimizeIcon = getTopbarIcon(minimizeButton)
 	if minimizeButton and minimizeIcon then
 		minimizeIcon.MouseButton1Click:Connect(function()
@@ -2081,12 +2384,7 @@ FirstTab = false
 	local closeIcon = getTopbarIcon(closeButton)
 	if closeButton and closeIcon then
 		closeIcon.MouseButton1Click:Connect(function()
-			Window.State = true
-			if dragBar then
-				dragBar.Visible = false
-			end
-			setMobileInputBlocked(false)
-			Aurexis:Destroy()
+			showCloseConfirmation()
 		end)
 		closeButton.MouseEnter:Connect(function()
 			tween(closeIcon, {ImageColor3 = Color3.new(1, 1, 1)})
