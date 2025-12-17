@@ -2065,50 +2065,70 @@ FirstTab = false
 		end
 	end
 
-	local closeConfirmationOverlay
-	local closeConfirmationDialog
+	local closeDialogState = {
+		host = nil,
+		page = nil,
+		hidden = {},
+	}
 
-	local function hideCloseConfirmation()
-		if not (closeConfirmationOverlay and closeConfirmationOverlay.Visible) then
-			return
-		end
-
-		tween(closeConfirmationOverlay, {BackgroundTransparency = 1}, function()
-			if closeConfirmationOverlay then
-				closeConfirmationOverlay.Visible = false
+	local function teardownCloseDialog()
+		if closeDialogState.page and closeDialogState.hidden then
+			for child, wasVisible in pairs(closeDialogState.hidden) do
+				if child and child.Parent == closeDialogState.page then
+					child.Visible = wasVisible
+				end
 			end
-		end)
-		if closeConfirmationDialog then
-			tween(closeConfirmationDialog, {Size = UDim2.fromOffset(340, 170)})
 		end
+		if closeDialogState.host then
+			closeDialogState.host:Destroy()
+		end
+		closeDialogState = {host = nil, page = nil, hidden = {}}
 	end
 
-	local function ensureCloseConfirmation()
-		if closeConfirmationOverlay and closeConfirmationOverlay.Parent then
-			return closeConfirmationOverlay, closeConfirmationDialog
+	local function buildCloseDialog()
+		local page = nil
+		if Elements and Elements.UIPageLayout then
+			page = Elements.UIPageLayout.CurrentPage
+		end
+		if not page and Elements and Window.CurrentTab then
+			page = Elements:FindFirstChild(Window.CurrentTab)
+		end
+		page = page or Elements
+		if not page then
+			return nil, nil
 		end
 
-		local overlay = Instance.new("Frame")
-		overlay.Name = "CloseConfirmation"
-		overlay.BackgroundColor3 = Color3.new(0, 0, 0)
-		overlay.BackgroundTransparency = 0.45
-		overlay.BorderSizePixel = 0
-		overlay.Size = UDim2.fromScale(1, 1)
-		overlay.Visible = false
-		overlay.ZIndex = 100
-		overlay.Active = true
-		overlay.Parent = AurexisUI
+		teardownCloseDialog()
+
+		local hidden = {}
+		for _, child in ipairs(page:GetChildren()) do
+			if child.Name ~= "CloseDialogHost" and not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
+				hidden[child] = child.Visible
+				child.Visible = false
+			end
+		end
+
+		local host = Instance.new("Frame")
+		host.Name = "CloseDialogHost"
+		host.BackgroundColor3 = Color3.new(0, 0, 0)
+		host.BackgroundTransparency = 0.35
+		host.BorderSizePixel = 0
+		host.Size = UDim2.fromScale(1, 1)
+		host.Position = UDim2.fromScale(0, 0)
+		host.ZIndex = 80
+		host.Active = true
+		host.Parent = page
 
 		local dialog = Instance.new("Frame")
 		dialog.Name = "Dialog"
 		dialog.AnchorPoint = Vector2.new(0.5, 0.5)
-		dialog.Position = UDim2.fromScale(0.5, 0.5)
+		dialog.Position = UDim2.fromScale(0.5, 0.45)
 		dialog.Size = UDim2.fromOffset(360, 190)
-		dialog.BackgroundColor3 = Color3.fromRGB(18, 22, 30)
-		dialog.BackgroundTransparency = 0.05
+		dialog.BackgroundColor3 = Color3.fromRGB(20, 24, 32)
+		dialog.BackgroundTransparency = 0.02
 		dialog.BorderSizePixel = 0
-		dialog.ZIndex = overlay.ZIndex + 1
-		dialog.Parent = overlay
+		dialog.ZIndex = host.ZIndex + 1
+		dialog.Parent = host
 		BlurModule(dialog)
 
 		local dialogCorner = Instance.new("UICorner")
@@ -2116,8 +2136,8 @@ FirstTab = false
 		dialogCorner.Parent = dialog
 
 		local dialogStroke = Instance.new("UIStroke")
-		dialogStroke.Color = Color3.fromRGB(110, 130, 170)
-		dialogStroke.Transparency = 0.35
+		dialogStroke.Color = Color3.fromRGB(90, 110, 150)
+		dialogStroke.Transparency = 0.25
 		dialogStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		dialogStroke.Parent = dialog
 
@@ -2136,7 +2156,7 @@ FirstTab = false
 		title.Position = UDim2.new(0, 18, 0, 16)
 		title.Size = UDim2.new(1, -36, 0, 26)
 		title.Font = Enum.Font.GothamBold
-		title.Text = "You are sure to clo"
+		title.Text = "Close window?"
 		title.TextColor3 = Color3.fromRGB(255, 255, 255)
 		title.TextSize = 20
 		title.TextXAlignment = Enum.TextXAlignment.Left
@@ -2149,7 +2169,7 @@ FirstTab = false
 		message.Position = UDim2.new(0, 18, 0, 48)
 		message.Size = UDim2.new(1, -36, 0, 46)
 		message.Font = Enum.Font.Gotham
-		message.Text = "Do you want to close SorinScript Hub?"
+		message.Text = "Are you sure you want to close this window?"
 		message.TextColor3 = Color3.fromRGB(220, 224, 232)
 		message.TextSize = 15
 		message.TextWrapped = true
@@ -2177,8 +2197,8 @@ FirstTab = false
 			local btn = Instance.new("TextButton")
 			btn.Name = name
 			btn.AutoButtonColor = false
-			btn.BackgroundColor3 = primary and Color3.fromRGB(86, 111, 255) or Color3.fromRGB(40, 46, 60)
-			btn.BackgroundTransparency = primary and 0 or 0.05
+			btn.BackgroundColor3 = primary and Color3.fromRGB(86, 111, 255) or Color3.fromRGB(34, 38, 48)
+			btn.BackgroundTransparency = primary and 0 or 0.08
 			btn.BorderSizePixel = 0
 			btn.Size = UDim2.new(0, 130, 1, 0)
 			btn.Font = Enum.Font.GothamMedium
@@ -2193,8 +2213,8 @@ FirstTab = false
 			corner.Parent = btn
 
 			local stroke = Instance.new("UIStroke")
-			stroke.Color = Color3.fromRGB(110, 130, 170)
-			stroke.Transparency = primary and 0.4 or 0.15
+			stroke.Color = Color3.fromRGB(90, 110, 150)
+			stroke.Transparency = primary and 0.35 or 0.2
 			stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 			stroke.Parent = btn
 
@@ -2204,15 +2224,15 @@ FirstTab = false
 		local cancelButton = makeButton("Cancel", "Cancel", false)
 		cancelButton.LayoutOrder = 1
 
-		local confirmButton = makeButton("Confirm", "Confirm", true)
+		local confirmButton = makeButton("Confirm", "Close", true)
 		confirmButton.LayoutOrder = 2
 
 		cancelButton.MouseButton1Click:Connect(function()
-			hideCloseConfirmation()
+			teardownCloseDialog()
 		end)
 
 		confirmButton.MouseButton1Click:Connect(function()
-			hideCloseConfirmation()
+			teardownCloseDialog()
 			Window.State = true
 			if dragBar then
 				dragBar.Visible = false
@@ -2221,26 +2241,25 @@ FirstTab = false
 			Aurexis:Destroy()
 		end)
 
-		closeConfirmationOverlay = overlay
-		closeConfirmationDialog = dialog
+		closeDialogState = {
+			host = host,
+			page = page,
+			hidden = hidden,
+		}
 
-		return closeConfirmationOverlay, closeConfirmationDialog
+		return host, dialog
 	end
 
 	local function showCloseConfirmation()
-		local overlay, dialog = ensureCloseConfirmation()
-		if not (overlay and dialog) then
-			return
-		end
-		if overlay.Visible then
+		local host, dialog = buildCloseDialog()
+		if not (host and dialog) then
 			return
 		end
 
-		overlay.BackgroundTransparency = 1
+		host.BackgroundTransparency = 1
 		dialog.Size = UDim2.fromOffset(340, 170)
 
-		overlay.Visible = true
-		tween(overlay, {BackgroundTransparency = 0.45})
+		tween(host, {BackgroundTransparency = 0.35})
 		tween(dialog, {Size = UDim2.fromOffset(360, 190)})
 	end
 
