@@ -2223,12 +2223,6 @@ FirstTab = false
 		dialog.Parent = host
 		applyRoundedCorner(dialog)
 
-		local dialogStroke = Instance.new("UIStroke")
-		dialogStroke.Color = Color3.fromRGB(120, 138, 190)
-		dialogStroke.Transparency = 0.28
-		dialogStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-		dialogStroke.Parent = dialog
-
 		local dialogGradient = Instance.new("UIGradient")
 		dialogGradient.Color = Aurexis.ThemeGradient
 		dialogGradient.Rotation = 125
@@ -2370,8 +2364,8 @@ FirstTab = false
 
 		local targetSize = closeDialogState.targetSize or dialog.Size
 
-		tween(host, {BackgroundTransparency = 0.1})
-		tween(dialog, {Size = targetSize, BackgroundTransparency = 0.08})
+		tween(host, {BackgroundTransparency = 0.05})
+		tween(dialog, {Size = targetSize, BackgroundTransparency = 0.05})
 	end
 
 	local minimizeIcon = getTopbarIcon(minimizeButton)
