@@ -10,9 +10,9 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 
 	HomeTabSettings = Kwargify({
 		Icon = 1,
-		GoodExecutors = {"Krnl", "Delta", "Wave", "Seliware", "Velocity", "Volcano", "MacSploit", "Macsploit", "Bunni", "Hydrogen", "Volt", "Sirhut"},
+		GoodExecutors = {"Krnl", "Delta", "Wave", "Seliware", "Velocity", "Volcano", "MacSploit", "Macsploit", "Bunni", "Hydrogen", "Volt", "Sirhut", "Potassium"},
 		BadExecutors = {"Solara", "Xeno"},
-		DetectedExecutors = {"Swift", "Valex", "Nucleus", "Potassium", "Codex"},
+		DetectedExecutors = {"Swift", "Valex", "Nucleus", "Codex"},
 		DiscordInvite = "XC5hpQQvMX" -- Only the invite code, not the full URL.
 	}, HomeTabSettings or {})
 
