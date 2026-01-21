@@ -34,14 +34,19 @@ by Nebula Softworks
 
 
 
-local BASE_URL = "https://raw.githubusercontent.com/SorinSoftware-Services/AurexisInterfaceLibrary/Unstable/New/"
+local BASE_URL = "https://raw.githubusercontent.com/SorinSoftware-Services/AurexisInterfaceLibrary/main/"
 
-local Release = "Closed Beta [v 0.1]"
+local Release = "Pre Release [v 0.2.6]"
 
 local Aurexis = { 
 	Folder = "AurexisLibrary UI", 
 	Options = {}, 
-	ThemeGradient = ColorSequence.new{ColorSequenceKeypoint.new(0.00, Color3.fromRGB(117, 164, 206)), ColorSequenceKeypoint.new(0.50, Color3.fromRGB(123, 201, 201)), ColorSequenceKeypoint.new(1.00, Color3.fromRGB(224, 138, 175))} 
+	AllowEnvironmentBlur = true,
+	ThemeGradient = ColorSequence.new{
+		ColorSequenceKeypoint.new(0.00, Color3.fromRGB(173, 216, 255)), -- baby blue
+		ColorSequenceKeypoint.new(0.50, Color3.fromRGB(100, 149, 237)), -- medium blue
+		ColorSequenceKeypoint.new(1.00, Color3.fromRGB(195, 144, 255))  -- lilac
+	} 
 }
 
 local UserInputService = game:GetService("UserInputService")
@@ -54,6 +59,76 @@ local Player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local CoreGui = game:GetService("CoreGui")
 local Lighting = game:GetService("Lighting")
+local ContextActionService = game:GetService("ContextActionService")
+
+local keycodeLookup = {}
+do
+	for _, code in ipairs(Enum.KeyCode:GetEnumItems()) do
+		keycodeLookup[string.lower(code.Name)] = code
+	end
+end
+
+local function normalizeKeyCode(key)
+	if typeof(key) == "EnumItem" and key.EnumType == Enum.KeyCode then
+		return key
+	end
+
+	if type(key) == "number" then
+		for _, code in ipairs(Enum.KeyCode:GetEnumItems()) do
+			if code.Value == key then
+				return code
+			end
+		end
+	end
+
+	if type(key) == "string" then
+		local trimmed = key:gsub("^%s+", ""):gsub("%s+$", "")
+		trimmed = trimmed:gsub("Enum.KeyCode%.", "")
+		trimmed = trimmed:gsub("%s+", "")
+		if trimmed == "" then
+			return nil
+		end
+
+		local lookup = keycodeLookup[string.lower(trimmed)]
+		if lookup then
+			return lookup
+		end
+	end
+
+	return nil
+end
+
+local function keyCodeLabel(key)
+	if typeof(key) == "EnumItem" and key.EnumType == Enum.KeyCode then
+		return key.Name
+	end
+	if type(key) == "string" then
+		local trimmed = key:gsub("^%s+", ""):gsub("%s+$", "")
+		trimmed = trimmed:gsub("Enum.KeyCode%.", "")
+		trimmed = trimmed:gsub("%s+", "")
+		if trimmed ~= "" then
+			return trimmed
+		end
+	end
+	return "Unknown"
+end
+
+local compatibilityPlaces = {
+	[16389395869] = true, -- a dusty trip
+}
+
+local compatibilityUniverses = {
+	[5650396773] = true, -- a dusty trip universe
+	[3989869156] = true, -- ANTS WAR
+	[111958650] = true,  -- Arsenal
+	[7848646653] = true, -- Break your Bones
+	[6401952734] = true, -- PETS GO!
+	[6035872082] = true, --RIVALS
+}
+
+if compatibilityPlaces[game.PlaceId] or compatibilityUniverses[game.GameId] then
+	Aurexis.AllowEnvironmentBlur = false
+end
 
 local isStudio
 local website = "https://scripts.sorinservice.online"
@@ -62,16 +137,34 @@ if RunService:IsStudio() then
 	isStudio = true
 end
 
+-- On touch devices, disable heavy environment blur by default
+if UserInputService.TouchEnabled and not isStudio then
+	Aurexis.AllowEnvironmentBlur = false
+end
+
 
 -- Universal remote require helper
 local function requireRemote(path)
 	local ok, result = pcall(function()
-		return loadstring(game:HttpGet(BASE_URL .. path))()
+		local body = game:HttpGet(BASE_URL .. path)
+		-- sanitize potential invisible Unicode characters from remote code
+		local replacements = {
+			{ string.char(0xC2, 0xA0), " " },      -- NBSP -> space
+			{ string.char(0xE2, 0x80, 0x8B), "" }, -- ZWSP
+			{ string.char(0xE2, 0x80, 0x8C), "" }, -- ZWNJ
+			{ string.char(0xE2, 0x80, 0x8D), "" }, -- ZWJ
+			{ string.char(0xEF, 0xBB, 0xBF), "" }, -- BOM
+		}
+		for i = 1, #replacements do
+			local patt, repl = replacements[i][1], replacements[i][2]
+			body = body:gsub(patt, repl)
+		end
+		return loadstring(body)()
 	end)
 	if ok then
 		return result
 	else
-		warn("⚠️ Failed to load module: " .. path .. " → " .. tostring(result))
+		warn("?? Failed to load module: " .. path .. " ? " .. tostring(result))
 		return {}
 	end
 end
@@ -79,13 +172,16 @@ end
 -- Load Icon Module
 local IconModule = requireRemote("src/icons.lua")
 
+-- Toggle key service (for loaders / consumers)
+local ToggleKeyService = requireRemote("src/services/toggle_key.lua")
+Aurexis.ToggleKeyService = ToggleKeyService
 
 -- Other Variables
 local request = (syn and syn.request) or (http and http.request) or http_request or nil
 local tweeninfo = TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 local PresetGradients = {
 	["Nightlight (Classic)"] = {Color3.fromRGB(147, 255, 239), Color3.fromRGB(201,211,233), Color3.fromRGB(255, 167, 227)},
-	["Nightlight (Neo)"] = {Color3.fromRGB(117, 164, 206), Color3.fromRGB(123, 201, 201), Color3.fromRGB(224, 138, 175)},
+	["Nightlight (Neo)"] = {Color3.fromRGB(173, 216, 255), Color3.fromRGB(100, 149, 237), Color3.fromRGB(195, 144, 255)},
 	Starlight = {Color3.fromRGB(147, 255, 239), Color3.fromRGB(181, 206, 241), Color3.fromRGB(214, 158, 243)},
 	Solar = {Color3.fromRGB(242, 157, 76), Color3.fromRGB(240, 179, 81), Color3.fromRGB(238, 201, 86)},
 	Sparkle = {Color3.fromRGB(199, 130, 242), Color3.fromRGB(221, 130, 238), Color3.fromRGB(243, 129, 233)},
@@ -173,11 +269,150 @@ function tween(object, goal, callback, tweenin)
 	tween:Play()
 end
 
+local topbarButtons = {}
+local topbarDecorations = {}
+
+local function registerTopbarButton(frame)
+	if not (frame and frame:IsA("Frame")) then
+		return
+	end
+	frame:SetAttribute("AurexisTopbarButton", true)
+	if frame.BackgroundTransparency ~= nil then
+		frame:SetAttribute("AurexisTopbarTargetBackground", frame.BackgroundTransparency)
+	end
+	local stroke = frame:FindFirstChildWhichIsA("UIStroke")
+	if stroke then
+		frame:SetAttribute("AurexisTopbarTargetStroke", stroke.Transparency)
+	end
+	local icon = frame:FindFirstChildWhichIsA("ImageButton") or frame:FindFirstChildWhichIsA("ImageLabel")
+	if icon then
+		frame:SetAttribute("AurexisTopbarTargetImage", icon.ImageTransparency)
+	end
+	for _, existing in ipairs(topbarButtons) do
+		if existing == frame then
+			return
+		end
+	end
+	table.insert(topbarButtons, frame)
+end
+
+local function registerTopbarDecoration(frame, targetBackground, targetStroke)
+	if not (frame and frame:IsA("Frame")) then
+		return
+	end
+	frame:SetAttribute("AurexisTopbarDecoration", true)
+	if targetBackground ~= nil then
+		frame:SetAttribute("AurexisTopbarTargetBackground", targetBackground)
+	elseif frame:GetAttribute("AurexisTopbarTargetBackground") == nil then
+		frame:SetAttribute("AurexisTopbarTargetBackground", frame.BackgroundTransparency or 0.35)
+	end
+	local stroke = frame:FindFirstChildWhichIsA("UIStroke")
+	if targetStroke ~= nil then
+		frame:SetAttribute("AurexisTopbarTargetStroke", targetStroke)
+	elseif stroke and frame:GetAttribute("AurexisTopbarTargetStroke") == nil then
+		frame:SetAttribute("AurexisTopbarTargetStroke", stroke.Transparency)
+	end
+	for _, existing in ipairs(topbarDecorations) do
+		if existing == frame then
+			return
+		end
+	end
+	table.insert(topbarDecorations, frame)
+end
+
+local function iterateTopbarButtons()
+	local active = {}
+	for _, button in ipairs(topbarButtons) do
+		if button and button.Parent then
+			table.insert(active, button)
+		end
+	end
+	return active
+end
+
+local function iterateTopbarDecorations()
+	local active = {}
+	for _, frame in ipairs(topbarDecorations) do
+		if frame and frame.Parent then
+			table.insert(active, frame)
+		end
+	end
+	return active
+end
+
+local function setTopbarVisible(visible)
+	for _, button in ipairs(iterateTopbarButtons()) do
+		local targetBackground = button:GetAttribute("AurexisTopbarTargetBackground") or 0.25
+		local stroke = button:FindFirstChildWhichIsA("UIStroke")
+		local icon = button:FindFirstChildWhichIsA("ImageButton") or button:FindFirstChildWhichIsA("ImageLabel")
+
+		if visible then
+			button.Visible = true
+		end
+
+		tween(button, {BackgroundTransparency = visible and targetBackground or 1})
+
+		if stroke then
+			local targetStroke = button:GetAttribute("AurexisTopbarTargetStroke") or 0.5
+			tween(stroke, {Transparency = visible and targetStroke or 1})
+		end
+
+		if icon then
+			local targetImage = button:GetAttribute("AurexisTopbarTargetImage") or 0.25
+			tween(icon, {ImageTransparency = visible and targetImage or 1})
+		end
+
+		if not visible then
+			button.Visible = false
+		end
+	end
+
+	for _, decoration in ipairs(iterateTopbarDecorations()) do
+		if visible then
+			decoration.Visible = true
+		end
+
+		local backgroundTarget = decoration:GetAttribute("AurexisTopbarTargetBackground") or 0.35
+		tween(decoration, {BackgroundTransparency = visible and backgroundTarget or 1})
+
+		local stroke = decoration:FindFirstChildWhichIsA("UIStroke")
+		if stroke then
+			local strokeTarget = decoration:GetAttribute("AurexisTopbarTargetStroke") or 0.5
+			tween(stroke, {Transparency = visible and strokeTarget or 1})
+		end
+
+		if not visible then
+			decoration.Visible = false
+		end
+	end
+end
+
 local cleanedLegacyBlur = false
-local activeBlurRefs = 0
+local blurBindings = {}
+local blurTargets = setmetatable({}, { __mode = "k" })
+local blurUid = 0
 local sharedDepthOfField
+local activeBlurCount = 0
+
+local function ensureBlurRoot()
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return nil
+	end
+	local root = camera:FindFirstChild("AurexisBlur")
+	if not root then
+		root = Instance.new("Folder")
+		root.Name = "AurexisBlur"
+		root.Parent = camera
+	end
+	return root
+end
 
 local function ensureDepthOfField()
+	if not Aurexis.AllowEnvironmentBlur then
+		return nil
+	end
+
 	if isStudio then
 		return nil
 	end
@@ -195,9 +430,257 @@ local function ensureDepthOfField()
 	sharedDepthOfField.FocusDistance = 51.6
 	sharedDepthOfField.InFocusRadius = 50
 	sharedDepthOfField.NearIntensity = 6
-	sharedDepthOfField.Enabled = activeBlurRefs > 0
+	sharedDepthOfField.Enabled = activeBlurCount > 0
 
 	return sharedDepthOfField
+end
+
+local function cleanupBlur(guiObject)
+	local data = blurBindings[guiObject]
+	if not data then
+		return
+	end
+	blurBindings[guiObject] = nil
+	if data.step then
+		data.step:Disconnect()
+	end
+	if data.uid then
+		RunService:UnbindFromRenderStep(data.uid)
+	end
+	if data.folder then
+		data.folder:Destroy()
+	end
+	if data.wrapper then
+		data.wrapper:Destroy()
+	end
+
+	blurTargets[guiObject] = nil
+
+	if activeBlurCount > 0 then
+		activeBlurCount = activeBlurCount - 1
+	end
+	local effect = ensureDepthOfField()
+	if effect then
+		effect.Enabled = activeBlurCount > 0
+	end
+end
+
+local function ensureGuiBlur(guiObject)
+	if not Aurexis.AllowEnvironmentBlur then
+		return nil
+	end
+
+	if blurBindings[guiObject] then
+		return blurBindings[guiObject]
+	end
+
+	local root = ensureBlurRoot()
+	local camera = workspace.CurrentCamera
+	if not root or not camera then
+		return nil
+	end
+
+	local wrapper = Instance.new("Frame")
+	wrapper.Name = guiObject.Name .. "_BlurFrame"
+	wrapper.Parent = guiObject
+	wrapper.Size = UDim2.new(0.95, 0, 0.95, 0)
+	wrapper.Position = UDim2.new(0.5, 0, 0.5, 0)
+	wrapper.AnchorPoint = Vector2.new(0.5, 0.5)
+	wrapper.BackgroundTransparency = 1
+
+	blurUid += 1
+	local uid = "neon::" .. tostring(blurUid)
+	local parts = {}
+	local folder = Instance.new("Folder")
+	folder.Name = wrapper.Name
+	folder.Parent = root
+
+	local parents = {}
+	local lastAbsPos
+	local lastAbsSize
+	local lastRotSum
+	local lastCameraCFrame
+	local lastCameraFov
+	local function addAncestor(child)
+		if child:IsA("GuiObject") then
+			parents[#parents + 1] = child
+			if child.Parent then
+				addAncestor(child.Parent)
+			end
+		end
+	end
+	addAncestor(wrapper)
+
+	local acos, max, pi, sqrt = math.acos, math.max, math.pi, math.sqrt
+	local sz = 0.22
+
+	local function drawTriangle(v1, v2, v3, p0, p1)
+		local s1 = (v1 - v2).Magnitude
+		local s2 = (v2 - v3).Magnitude
+		local s3 = (v3 - v1).Magnitude
+		local smax = max(s1, s2, s3)
+		local A, B, C
+		if smax == s1 then
+			A, B, C = v1, v2, v3
+		elseif smax == s2 then
+			A, B, C = v2, v3, v1
+		else
+			A, B, C = v3, v1, v2
+		end
+
+		local para = ((B - A).X*(C - A).X + (B - A).Y*(C - A).Y + (B - A).Z*(C - A).Z) / (A - B).Magnitude
+		local perp = sqrt((C - A).Magnitude^2 - para * para)
+		local dif_para = (A - B).Magnitude - para
+
+		local st = CFrame.new(B, A)
+		local za = CFrame.Angles(pi/2, 0, 0)
+
+		local cf0 = st
+		local topLook = (cf0 * za).LookVector
+		local midPoint = A + CFrame.new(A, B).LookVector * para
+		local neededLook = CFrame.new(midPoint, C).LookVector
+		local dot = topLook.X*neededLook.X + topLook.Y*neededLook.Y + topLook.Z*neededLook.Z
+
+		local ac = CFrame.Angles(0, 0, acos(dot))
+
+		cf0 = cf0 * ac
+		if ((cf0 * za).LookVector - neededLook).Magnitude > 0.01 then
+			cf0 = cf0 * CFrame.Angles(0, 0, -2 * acos(dot))
+		end
+		cf0 = cf0 * CFrame.new(0, perp/2, -(dif_para + para/2))
+
+		local cf1 = st * ac * CFrame.Angles(0, pi, 0)
+		if ((cf1 * za).LookVector - neededLook).Magnitude > 0.01 then
+			cf1 = cf1 * CFrame.Angles(0, 0, 2 * acos(dot))
+		end
+		cf1 = cf1 * CFrame.new(0, perp/2, dif_para/2)
+
+		if not p0 then
+			p0 = Instance.new("Part")
+			p0.FormFactor = Enum.FormFactor.Custom
+			p0.TopSurface = Enum.SurfaceType.Smooth
+			p0.BottomSurface = Enum.SurfaceType.Smooth
+			p0.Anchored = true
+			p0.CanCollide = false
+			p0.CastShadow = false
+			p0.Material = Enum.Material.Glass
+			p0.Size = Vector3.new(sz, sz, sz)
+		end
+
+		local mesh0 = p0:FindFirstChild("WedgeMesh")
+		if not mesh0 then
+			mesh0 = Instance.new("SpecialMesh")
+			mesh0.MeshType = Enum.MeshType.Wedge
+			mesh0.Name = "WedgeMesh"
+			mesh0.Parent = p0
+		end
+
+		p0.WedgeMesh.Scale = Vector3.new(0, perp/sz, para/sz)
+		p0.CFrame = cf0
+
+		if not p1 then
+			p1 = p0:Clone()
+		end
+
+		local mesh1 = p1:FindFirstChild("WedgeMesh")
+		if not mesh1 then
+			mesh1 = Instance.new("SpecialMesh")
+			mesh1.MeshType = Enum.MeshType.Wedge
+			mesh1.Name = "WedgeMesh"
+			mesh1.Parent = p1
+		end
+
+		p1.WedgeMesh.Scale = Vector3.new(0, perp/sz, dif_para/sz)
+		p1.CFrame = cf1
+
+		return p0, p1
+	end
+
+	local function drawQuad(v1, v2, v3, v4, partsTable)
+		partsTable[1], partsTable[2] = drawTriangle(v1, v2, v3, partsTable[1], partsTable[2])
+		partsTable[3], partsTable[4] = drawTriangle(v3, v2, v4, partsTable[3], partsTable[4])
+	end
+
+	local function updateOrientation(fetchProps)
+		local absPos = wrapper.AbsolutePosition
+		local absSize = wrapper.AbsoluteSize
+		local cameraCFrame = camera.CFrame
+		local cameraFov = camera.FieldOfView
+
+		local rot = 0
+		for _, ancestor in ipairs(parents) do
+			rot = rot + ancestor.Rotation
+		end
+		if not fetchProps
+			and lastAbsPos
+			and lastAbsPos == absPos
+			and lastAbsSize == absSize
+			and rot == lastRotSum
+			and cameraCFrame == lastCameraCFrame
+			and cameraFov == lastCameraFov then
+			return
+		end
+
+		lastAbsPos = absPos
+		lastAbsSize = absSize
+		lastRotSum = rot
+		lastCameraCFrame = cameraCFrame
+		lastCameraFov = cameraFov
+
+		local zIndex = 1 - 0.05 * wrapper.ZIndex
+
+		local tl = absPos
+		local br = absPos + absSize
+		local tr = Vector2.new(br.X, tl.Y)
+		local bl = Vector2.new(tl.X, br.Y)
+
+		if rot ~= 0 and rot % 180 ~= 0 then
+			local mid = tl:Lerp(br, 0.5)
+			local s = math.sin(math.rad(rot))
+			local c = math.cos(math.rad(rot))
+			tl = Vector2.new(c*(tl.X - mid.X) - s*(tl.Y - mid.Y), s*(tl.X - mid.X) + c*(tl.Y - mid.Y)) + mid
+			tr = Vector2.new(c*(tr.X - mid.X) - s*(tr.Y - mid.Y), s*(tr.X - mid.X) + c*(tr.Y - mid.Y)) + mid
+			bl = Vector2.new(c*(bl.X - mid.X) - s*(bl.Y - mid.Y), s*(bl.X - mid.X) + c*(bl.Y - mid.Y)) + mid
+			br = Vector2.new(c*(br.X - mid.X) - s*(br.Y - mid.Y), s*(br.X - mid.X) + c*(br.Y - mid.Y)) + mid
+		end
+
+		drawQuad(
+			camera:ScreenPointToRay(tl.X, tl.Y, zIndex).Origin,
+			camera:ScreenPointToRay(tr.X, tr.Y, zIndex).Origin,
+			camera:ScreenPointToRay(bl.X, bl.Y, zIndex).Origin,
+			camera:ScreenPointToRay(br.X, br.Y, zIndex).Origin,
+			parts
+		)
+
+		if fetchProps then
+			for _, part in ipairs(parts) do
+				part.Parent = folder
+				part.Transparency = 0.98
+				part.BrickColor = BrickColor.new("Institutional white")
+			end
+		end
+	end
+
+	updateOrientation(true)
+	RunService:BindToRenderStep(uid, 2000, function()
+		updateOrientation(false)
+	end)
+
+	blurBindings[guiObject] = {
+		wrapper = wrapper,
+		folder = folder,
+		parts = parts,
+		uid = uid,
+	}
+	blurTargets[guiObject] = true
+
+	activeBlurCount = activeBlurCount + 1
+	local effect = ensureDepthOfField()
+	if effect then
+		effect.Enabled = true
+	end
+
+	return blurBindings[guiObject]
 end
 
 local function BlurModule(Frame)
@@ -232,10 +715,9 @@ local function BlurModule(Frame)
 
 	if not guiObject:GetAttribute("AurexisBlurApplied") then
 		guiObject:SetAttribute("AurexisBlurApplied", true)
-		activeBlurRefs = activeBlurRefs + 1
-		local depth = ensureDepthOfField()
-		if depth then
-			depth.Enabled = true
+		blurTargets[guiObject] = true
+		if Aurexis.AllowEnvironmentBlur then
+			ensureGuiBlur(guiObject)
 		end
 	end
 
@@ -262,12 +744,10 @@ local function BlurModule(Frame)
 	local function releaseBlur()
 		if guiObject:GetAttribute("AurexisBlurApplied") then
 			guiObject:SetAttribute("AurexisBlurApplied", nil)
-			activeBlurRefs = math.max(0, activeBlurRefs - 1)
-			local depth = ensureDepthOfField()
-			if depth and activeBlurRefs == 0 then
-				depth.Enabled = false
-			end
 		end
+
+		cleanupBlur(guiObject)
+		blurTargets[guiObject] = nil
 
 		zConn:Disconnect()
 		if shadow.Parent then
@@ -306,6 +786,28 @@ end
 local AurexisUI = isStudio and script.Parent:WaitForChild("Aurexis UI") or game:GetObjects("rbxassetid://86467455075715")[1]
 
 local SizeBleh = nil
+local mainWindowFrame = nil
+
+-- Helper to prevent camera movement on mobile while the main window is open
+local MOBILE_BLOCK_ACTION = "Aurexis_BlockMobileTouch"
+local function setMobileInputBlocked(block)
+	if not UserInputService.TouchEnabled or isStudio then
+		return
+	end
+
+	if block then
+		ContextActionService:BindAction(
+			MOBILE_BLOCK_ACTION,
+			function()
+				return Enum.ContextActionResult.Sink
+			end,
+			false,
+			Enum.UserInputType.Touch
+		)
+	else
+		ContextActionService:UnbindAction(MOBILE_BLOCK_ACTION)
+	end
+end
 
 local function Hide(Window, bind, notif)
 	SizeBleh = Window.Size
@@ -322,20 +824,47 @@ local function Hide(Window, bind, notif)
 	tween(Window.Logo, {ImageTransparency = 1})
 	tween(Window.Navigation.Line, {BackgroundTransparency = 1})
 
-	for _, TopbarButton in ipairs(Window.Controls:GetChildren()) do
-		if TopbarButton.ClassName == "Frame" then
-			tween(TopbarButton, {BackgroundTransparency = 1})
-			tween(TopbarButton.UIStroke, {Transparency = 1})
-			tween(TopbarButton.ImageLabel, {ImageTransparency = 1})
-			TopbarButton.Visible = false
+	if Window == mainWindowFrame then
+		setTopbarVisible(false)
+		setMobileInputBlocked(false)
+	else
+		local controlsContainer = nil
+		if typeof(Window) == "Instance" then
+			controlsContainer = Window:FindFirstChild("Controls")
+		end
+		controlsContainer = controlsContainer or (Window and Window.Controls)
+
+		if controlsContainer then
+			for _, TopbarButton in ipairs(controlsContainer:GetChildren()) do
+				if TopbarButton.ClassName == "Frame" then
+					tween(TopbarButton, {BackgroundTransparency = 1})
+					local stroke = TopbarButton:FindFirstChildWhichIsA("UIStroke")
+					if stroke then
+						tween(stroke, {Transparency = 1})
+					end
+					local icon = TopbarButton:FindFirstChildWhichIsA("ImageButton") or TopbarButton:FindFirstChildWhichIsA("ImageLabel")
+					if icon then
+						tween(icon, {ImageTransparency = 1})
+					end
+					TopbarButton.Visible = false
+				end
+			end
 		end
 	end
 	for _, tabbtn in ipairs(Window.Navigation.Tabs:GetChildren()) do
 		if tabbtn.ClassName == "Frame" and tabbtn.Name ~= "InActive Template" then
 			TweenService:Create(tabbtn, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-			TweenService:Create(tabbtn.ImageLabel, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
-			TweenService:Create(tabbtn.DropShadowHolder.DropShadow, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
-			TweenService:Create(tabbtn.UIStroke, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
+			if tabbtn.ImageLabel then
+				TweenService:Create(tabbtn.ImageLabel, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
+			end
+			local dropShadowHolder = tabbtn:FindFirstChild("DropShadowHolder")
+			if dropShadowHolder and dropShadowHolder:FindFirstChild("DropShadow") then
+				TweenService:Create(dropShadowHolder.DropShadow, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
+			end
+			local tabStroke = tabbtn:FindFirstChildWhichIsA("UIStroke")
+			if tabStroke then
+				TweenService:Create(tabStroke, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
+			end
 		end
 	end
 
@@ -383,6 +912,7 @@ AurexisUI.Notifications.Template.Visible = false
 AurexisUI.DisplayOrder = 1000000000
 
 local Main : Frame = AurexisUI.SmartWindow
+mainWindowFrame = Main
 local Dragger = Main.Drag
 local dragBar = AurexisUI.Drag
 local dragInteract = dragBar and dragBar.Interact or nil
@@ -390,6 +920,341 @@ local dragBarCosmetic = dragBar and dragBar.Drag or nil
 local Elements = Main.Elements.Interactions
 local LoadingFrame = Main.LoadingFrame
 local Navigation = Main.Navigation
+local Controls = Main.Controls
+local closeButton = Controls and Controls:FindFirstChild("Close", true) or nil
+local toggleSizeButton = Controls and Controls:FindFirstChild("ToggleSize", true) or nil
+local minimizeButton = Controls and Controls:FindFirstChild("Minimize", true) or nil
+local closeDialogState = {host = nil, dialog = nil, targetSize = nil, scrollers = {}}
+
+if not minimizeButton and closeButton then
+	minimizeButton = closeButton:Clone()
+	minimizeButton.Name = "Minimize"
+	minimizeButton.Visible = closeButton.Visible
+	local icon = minimizeButton:FindFirstChildWhichIsA("ImageButton") or minimizeButton:FindFirstChildWhichIsA("ImageLabel")
+	local minimizeIcon = Aurexis:GetIcon("minimize", "Material")
+	if icon and minimizeIcon then
+		if typeof(minimizeIcon) == "table" and minimizeIcon.id then
+			icon.Image = "rbxassetid://" .. minimizeIcon.id
+			icon.ImageRectOffset = minimizeIcon.imageRectOffset
+			icon.ImageRectSize = minimizeIcon.imageRectSize
+		else
+			icon.Image = minimizeIcon
+			icon.ImageRectOffset = Vector2.new(0, 0)
+			icon.ImageRectSize = Vector2.new(0, 0)
+		end
+	end
+end
+
+local allowToggleButton = UserInputService.KeyboardEnabled ~= false
+if toggleSizeButton and not allowToggleButton then
+	toggleSizeButton.Visible = false
+	toggleSizeButton = nil
+end
+
+local orderedButtons = {}
+if minimizeButton then
+	table.insert(orderedButtons, minimizeButton)
+end
+if toggleSizeButton then
+	table.insert(orderedButtons, toggleSizeButton)
+end
+if closeButton then
+	table.insert(orderedButtons, closeButton)
+end
+
+for _, button in ipairs(orderedButtons) do
+	registerTopbarButton(button)
+end
+
+local controlClusterParent = Controls
+local referenceButton = closeButton or toggleSizeButton or minimizeButton
+local clusterAnchor = referenceButton and referenceButton.AnchorPoint or Vector2.new(0.5, 0.5)
+local clusterPosition = referenceButton and referenceButton.Position or UDim2.new(1, -10, 0, 0)
+local buttonSize = referenceButton and referenceButton.Size or UDim2.fromOffset(32, 32)
+local controlCluster = nil
+
+if controlClusterParent then
+	controlCluster = controlClusterParent:FindFirstChild("ControlCluster")
+end
+
+if controlCluster and controlCluster.Parent ~= controlClusterParent then
+	controlCluster.Parent = controlClusterParent
+end
+
+if not controlCluster then
+	controlCluster = Instance.new("Frame")
+	controlCluster.Name = "ControlCluster"
+	controlCluster.Parent = controlClusterParent
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 7)
+	corner.Parent = controlCluster
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Name = "ControlClusterStroke"
+	stroke.Thickness = 1
+	stroke.Transparency = 0.6
+	stroke.Color = Color3.fromRGB(94, 98, 120)
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	stroke.ZIndex = referenceButton and referenceButton.ZIndex or 1
+	stroke.Parent = controlCluster
+
+	registerTopbarDecoration(controlCluster, 0.55, stroke.Transparency)
+else
+	local stroke = controlCluster:FindFirstChildWhichIsA("UIStroke")
+	if stroke then
+		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		stroke.ZIndex = referenceButton and referenceButton.ZIndex or stroke.ZIndex
+		controlCluster:SetAttribute("AurexisTopbarTargetStroke", stroke.Transparency)
+	end
+	controlCluster:SetAttribute("AurexisTopbarTargetBackground", 0.55)
+	registerTopbarDecoration(controlCluster, 0.55, stroke and stroke.Transparency or nil)
+end
+
+controlCluster.AnchorPoint = clusterAnchor
+controlCluster.Position = clusterPosition
+controlCluster.AutomaticSize = Enum.AutomaticSize.XY
+controlCluster.BackgroundColor3 = Color3.fromRGB(32, 30, 38)
+controlCluster.BackgroundTransparency = 0.55
+controlCluster:SetAttribute("AurexisTopbarTargetBackground", 0.55)
+controlCluster.BorderSizePixel = 0
+controlCluster.Size = UDim2.new(0, 0, 0, 0)
+controlCluster.Visible = false
+controlCluster.ZIndex = referenceButton and math.max(referenceButton.ZIndex - 1, 0) or 0
+controlCluster.LayoutOrder = referenceButton and (referenceButton.LayoutOrder or 0) or 0
+
+local clusterLayout = controlCluster:FindFirstChild("ControlLayout")
+if not clusterLayout then
+	clusterLayout = Instance.new("UIListLayout")
+	clusterLayout.Name = "ControlLayout"
+	clusterLayout.FillDirection = Enum.FillDirection.Horizontal
+	clusterLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	clusterLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	clusterLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	clusterLayout.Padding = UDim.new(0, 3)
+	clusterLayout.Parent = controlCluster
+end
+
+local clusterPadding = controlCluster:FindFirstChild("ControlPadding")
+if not clusterPadding then
+	clusterPadding = Instance.new("UIPadding")
+	clusterPadding.Name = "ControlPadding"
+	clusterPadding.PaddingTop = UDim.new(0, 2)
+	clusterPadding.PaddingBottom = UDim.new(0, 2)
+	clusterPadding.PaddingLeft = UDim.new(0, 4)
+	clusterPadding.PaddingRight = UDim.new(0, 4)
+	clusterPadding.Parent = controlCluster
+else
+	clusterPadding.PaddingTop = UDim.new(0, 2)
+	clusterPadding.PaddingBottom = UDim.new(0, 2)
+	clusterPadding.PaddingLeft = UDim.new(0, 4)
+	clusterPadding.PaddingRight = UDim.new(0, 4)
+end
+
+for _, child in ipairs(controlCluster:GetChildren()) do
+	if child.Name:match("^ControlDivider") then
+		child:Destroy()
+	end
+end
+
+local dividerHeight = math.max(buttonSize.Y.Offset - 6, 10)
+local layoutOrder = 1
+
+local function addDivider(order)
+	local divider = Instance.new("Frame")
+	divider.Name = "ControlDivider" .. order
+	divider.BackgroundColor3 = Color3.fromRGB(96, 100, 122)
+	divider.BackgroundTransparency = 0.45
+	divider.BorderSizePixel = 0
+	divider.Size = UDim2.new(0, 1, 0, dividerHeight)
+	divider.LayoutOrder = order
+	divider.ZIndex = referenceButton and referenceButton.ZIndex or 1
+	divider.Parent = controlCluster
+	registerTopbarDecoration(divider, divider.BackgroundTransparency, nil)
+end
+
+for index, button in ipairs(orderedButtons) do
+	if button then
+		button.Parent = controlCluster
+		button.LayoutOrder = layoutOrder
+		layoutOrder += 1
+		if index < #orderedButtons then
+			addDivider(layoutOrder)
+			layoutOrder += 1
+		end
+	end
+end
+
+local function scaleUDim2(size: UDim2, multiplier: number): UDim2
+	return UDim2.new(
+		size.X.Scale * multiplier,
+		math.floor(size.X.Offset * multiplier),
+		size.Y.Scale * multiplier,
+		math.floor(size.Y.Offset * multiplier)
+	)
+end
+
+local function createLayeredSpinner(baseImageLabel: ImageLabel?)
+	if not baseImageLabel or not baseImageLabel.Parent then
+		return nil
+	end
+
+	if not baseImageLabel:IsA("ImageLabel") then
+		return nil
+	end
+
+	local spinner = {
+		layers = {},
+		coreTransparency = 0.25,
+	}
+
+	local sizeMultiplier = 0.65
+	local spinnerBaseSize = scaleUDim2(baseImageLabel.Size, sizeMultiplier)
+
+	local container = Instance.new("Frame")
+	container.Name = "LayeredSpinner"
+	container.AnchorPoint = baseImageLabel.AnchorPoint
+	container.Position = baseImageLabel.Position
+	container.Size = spinnerBaseSize
+	container.BackgroundTransparency = 1
+	container.ZIndex = baseImageLabel.ZIndex
+	container.LayoutOrder = baseImageLabel.LayoutOrder
+	container.Parent = baseImageLabel.Parent
+	container.Visible = true
+
+	baseImageLabel.Visible = false
+
+	local function lighten(color: Color3, amount: number): Color3
+		local alpha = math.clamp(amount or 0, 0, 1)
+		return Color3.new(
+			color.R + (1 - color.R) * alpha,
+			color.G + (1 - color.G) * alpha,
+			color.B + (1 - color.B) * alpha
+		)
+	end
+
+	local ringPalette = {
+		Color3.fromRGB(190, 225, 255),
+		Color3.fromRGB(162, 205, 255),
+		Color3.fromRGB(134, 185, 255)
+	}
+
+	local accentPalette = {
+		Color3.fromRGB(195, 144, 255),
+		Color3.fromRGB(182, 130, 255),
+		Color3.fromRGB(205, 170, 255)
+	}
+
+	local ringConfigs = {
+		{scale = 1, thickness = 5, speed = 120, direction = 1, color = ringPalette[1], accentColor = accentPalette[1], gradientRotation = 5, targetTransparency = 0.08},
+		{scale = 0.78, thickness = 4, speed = 180, direction = -1, color = ringPalette[2], accentColor = accentPalette[2], gradientRotation = -15, targetTransparency = 0.05},
+		{scale = 0.52, thickness = 3, speed = 240, direction = 1, color = ringPalette[3], accentColor = accentPalette[3], gradientRotation = 35, targetTransparency = 0}
+	}
+
+	for index, config in ipairs(ringConfigs) do
+		local ring = Instance.new("Frame")
+		ring.Name = "Ring_" .. index
+		ring.AnchorPoint = Vector2.new(0.5, 0.5)
+		ring.Position = UDim2.fromScale(0.5, 0.5)
+		ring.Size = scaleUDim2(spinnerBaseSize, config.scale)
+		ring.BackgroundTransparency = 1
+		ring.ZIndex = container.ZIndex + index
+		ring.Parent = container
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(1, 0)
+		corner.Parent = ring
+
+		local stroke = Instance.new("UIStroke")
+		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		stroke.LineJoinMode = Enum.LineJoinMode.Round
+		stroke.Color = config.color
+		stroke.Thickness = config.thickness
+		stroke.Transparency = 1
+		stroke.Parent = ring
+
+		local gradient = Instance.new("UIGradient")
+		local accentColor = config.accentColor or config.color
+		gradient.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, lighten(config.color, 0.25)),
+			ColorSequenceKeypoint.new(0.45, config.color),
+			ColorSequenceKeypoint.new(0.8, accentColor),
+			ColorSequenceKeypoint.new(1, lighten(accentColor, 0.4))
+		})
+		gradient.Rotation = config.gradientRotation or 0
+		gradient.Parent = stroke
+
+		table.insert(spinner.layers, {
+			gui = ring,
+			stroke = stroke,
+			speed = config.speed,
+			direction = config.direction,
+			targetTransparency = config.targetTransparency or 0
+		})
+	end
+
+	local core = Instance.new("Frame")
+	core.Name = "Core"
+	core.AnchorPoint = Vector2.new(0.5, 0.5)
+	core.Position = UDim2.fromScale(0.5, 0.5)
+	core.Size = scaleUDim2(spinnerBaseSize, 0.25)
+	core.BackgroundColor3 = Color3.fromRGB(236, 247, 255)
+	core.BackgroundTransparency = 1
+	core.ZIndex = container.ZIndex + 5
+	core.Parent = container
+
+	local coreCorner = Instance.new("UICorner")
+	coreCorner.CornerRadius = UDim.new(1, 0)
+	coreCorner.Parent = core
+
+	local coreStroke = Instance.new("UIStroke")
+	coreStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	coreStroke.Thickness = 1.5
+	coreStroke.Color = Color3.fromRGB(186, 220, 255)
+	coreStroke.Transparency = 1
+	coreStroke.Parent = core
+
+	spinner.container = container
+	spinner.core = core
+	spinner.coreStroke = coreStroke
+
+	function spinner:SetVisible(isVisible, info)
+		local tweenInfo = info or TweenInfo.new(0.35, Enum.EasingStyle.Exponential)
+		for _, layer in ipairs(self.layers) do
+			local target = isVisible and layer.targetTransparency or 1
+			TweenService:Create(layer.stroke, tweenInfo, {Transparency = target}):Play()
+		end
+		if self.core then
+			TweenService:Create(self.core, tweenInfo, {BackgroundTransparency = isVisible and self.coreTransparency or 1}):Play()
+		end
+		if self.coreStroke then
+			TweenService:Create(self.coreStroke, tweenInfo, {Transparency = isVisible and 0.35 or 1}):Play()
+		end
+	end
+
+	function spinner:Start()
+		if self.renderConnection then
+			return
+		end
+		self.renderConnection = RunService.RenderStepped:Connect(function(dt)
+			for _, layer in ipairs(self.layers) do
+				local delta = dt * layer.speed * layer.direction
+				layer.gui.Rotation = (layer.gui.Rotation + delta) % 360
+			end
+		end)
+	end
+
+	function spinner:Stop()
+		if self.renderConnection then
+			self.renderConnection:Disconnect()
+			self.renderConnection = nil
+		end
+	end
+
+	return spinner
+end
+
+local LayeredLoadingSpinner = createLayeredSpinner(LoadingFrame and LoadingFrame.Frame and LoadingFrame.Frame:FindFirstChild("ImageLabel"))
 local Tabs = Navigation.Tabs
 local Notifications = AurexisUI.Notifications
 local KeySystem : Frame = Main.KeySystem
@@ -567,46 +1432,91 @@ local function Unhide(Window, currentTab)
 	tween(Window.Logo, {ImageTransparency = 0})
 	tween(Window.Navigation.Line, {BackgroundTransparency = 0})
 
-	for _, TopbarButton in ipairs(Window.Controls:GetChildren()) do
-		if TopbarButton.ClassName == "Frame" and TopbarButton.Name ~= "Theme" then
-			TopbarButton.Visible = true
-			tween(TopbarButton, {BackgroundTransparency = 0.25})
-			tween(TopbarButton.UIStroke, {Transparency = 0.5})
-			tween(TopbarButton.ImageLabel, {ImageTransparency = 0.25})
+	if Window == mainWindowFrame then
+		setTopbarVisible(true)
+		setMobileInputBlocked(true)
+	else
+		local controlsContainer = nil
+		if typeof(Window) == "Instance" then
+			controlsContainer = Window:FindFirstChild("Controls")
+		end
+		controlsContainer = controlsContainer or (Window and Window.Controls)
+
+		if controlsContainer then
+			for _, TopbarButton in ipairs(controlsContainer:GetChildren()) do
+				if TopbarButton.ClassName == "Frame" and TopbarButton.Name ~= "Theme" then
+					TopbarButton.Visible = true
+					tween(TopbarButton, {BackgroundTransparency = 0.25})
+					local stroke = TopbarButton:FindFirstChildWhichIsA("UIStroke")
+					if stroke then
+						tween(stroke, {Transparency = 0.5})
+					end
+					local icon = TopbarButton:FindFirstChildWhichIsA("ImageButton") or TopbarButton:FindFirstChildWhichIsA("ImageLabel")
+					if icon then
+						tween(icon, {ImageTransparency = 0.25})
+					end
+				end
+			end
 		end
 	end
 	for _, tabbtn in ipairs(Window.Navigation.Tabs:GetChildren()) do
 		if tabbtn.ClassName == "Frame" and tabbtn.Name ~= "InActive Template" then
+			local tabStroke = tabbtn:FindFirstChildWhichIsA("UIStroke")
 			if tabbtn.Name == currentTab then
 				TweenService:Create(tabbtn, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-				TweenService:Create(tabbtn.UIStroke, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {Transparency = 0.41}):Play()
+				if tabStroke then
+					TweenService:Create(tabStroke, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {Transparency = 0.41}):Play()
+				end
 			end
-			TweenService:Create(tabbtn.ImageLabel, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
-			TweenService:Create(tabbtn.DropShadowHolder.DropShadow, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
+			if tabbtn.ImageLabel then
+				TweenService:Create(tabbtn.ImageLabel, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
+			end
+			local dropShadowHolder = tabbtn:FindFirstChild("DropShadowHolder")
+			if dropShadowHolder and dropShadowHolder:FindFirstChild("DropShadow") then
+				TweenService:Create(dropShadowHolder.DropShadow, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
+			end
 		end
 	end
 
 end
 
 local MainSize
-local MinSize 
-if Camera.ViewportSize.X > 774 and Camera.ViewportSize.Y > 503 then
-	MainSize = UDim2.fromOffset(675, 424)
-	MinSize = UDim2.fromOffset(500, 42)
-else
-	MainSize = UDim2.fromOffset(Camera.ViewportSize.X - 100, Camera.ViewportSize.Y - 100)
-	MinSize = UDim2.fromOffset(Camera.ViewportSize.X - 275, 42)
+local MinSize
+
+local function computeWindowSizes()
+	local viewportSize = Camera and Camera.ViewportSize or Vector2.new(1280, 720)
+
+	if viewportSize.X > 774 and viewportSize.Y > 503 then
+		-- Desktop / larger screens: keep original default window size
+		MainSize = UDim2.fromOffset(675, 424)
+		MinSize = UDim2.fromOffset(500, 42)
+	else
+		-- Smaller / mobile screens: use dynamic padding instead of fixed offsets
+		local widthPadding = math.clamp(math.floor(viewportSize.X * 0.10), 40, 140)
+		local heightPadding = math.clamp(math.floor(viewportSize.Y * 0.14), 40, 140)
+
+		MainSize = UDim2.fromOffset(viewportSize.X - widthPadding, viewportSize.Y - heightPadding)
+		MinSize = UDim2.fromOffset(viewportSize.X - math.max(widthPadding * 2.5, 275), 42)
+	end
 end
 
+computeWindowSizes()
+
 local function Maximise(Window)
-	Window.Controls.ToggleSize.ImageLabel.Image = "rbxassetid://10137941941"
+	local toggleImageLabel = toggleSizeButton and (toggleSizeButton:FindFirstChildWhichIsA("ImageButton") or toggleSizeButton:FindFirstChildWhichIsA("ImageLabel"))
+	if toggleImageLabel then
+		toggleImageLabel.Image = "rbxassetid://10137941941"
+	end
 	tween(Window, {Size = MainSize})
 	Window.Elements.Visible = true
 	Window.Navigation.Visible = true
 end
 
 local function Minimize(Window)
-	Window.Controls.ToggleSize.ImageLabel.Image = "rbxassetid://11036884234"
+	local toggleImageLabel = toggleSizeButton and (toggleSizeButton:FindFirstChildWhichIsA("ImageButton") or toggleSizeButton:FindFirstChildWhichIsA("ImageLabel"))
+	if toggleImageLabel then
+		toggleImageLabel.Image = "rbxassetid://11036884234"
+	end
 	Window.Elements.Visible = false
 	Window.Navigation.Visible = false
 	tween(Window, {Size = MinSize})
@@ -617,8 +1527,8 @@ function Aurexis:CreateWindow(WindowSettings)
 
 	WindowSettings = Kwargify({
 		Name = "AurexisHub UI",
-		Subtitle = "Credits NebulaSoftworks",
-		LogoID = "77656423525793",
+		Subtitle = "Credits: LunaInterfaceSuite",
+		LogoID = "84637769762084",
 		LoadingEnabled = true,
 		LoadingTitle = "Aurexis Interface Library",
 		LoadingSubtitle = "by SorinSoftware Services",
@@ -626,7 +1536,8 @@ function Aurexis:CreateWindow(WindowSettings)
 		ConfigSettings = {},
 
 		KeySystem = false,
-		KeySettings = {}
+		KeySettings = {},
+		ToggleKey = Enum.KeyCode.K
 	}, WindowSettings or {})
 
 	WindowSettings.ConfigSettings = Kwargify({
@@ -652,7 +1563,41 @@ function Aurexis:CreateWindow(WindowSettings)
 
 	local Passthrough = false
 
-	local Window = { Bind = Enum.KeyCode.K, CurrentTab = nil, State = true, Size = false, Settings = nil }
+	local defaultToggleKey = normalizeKeyCode(WindowSettings.ToggleKey) or Enum.KeyCode.K
+	local Window = {
+		Bind = defaultToggleKey,
+		BindName = keyCodeLabel(defaultToggleKey),
+		CurrentTab = nil,
+		State = true,
+		Size = false,
+		Settings = nil
+	}
+
+	local function setWindowToggleBind(newBind)
+		local resolved = normalizeKeyCode(newBind)
+		if not resolved or resolved == Enum.KeyCode.Unknown then
+			return false, "Invalid key"
+		end
+		if resolved == Window.Bind then
+			return true, Window.BindName
+		end
+
+		Window.Bind = resolved
+		Window.BindName = keyCodeLabel(resolved)
+		return true, Window.BindName
+	end
+
+	function Window:SetToggleBind(newBind)
+		return setWindowToggleBind(newBind)
+	end
+
+	function Window:GetToggleBind()
+		return Window.Bind
+	end
+
+	function Window:GetToggleBindName()
+		return Window.BindName or keyCodeLabel(Window.Bind)
+	end
 
 	Main.Title.Title.Text = WindowSettings.Name
 	Main.Title.subtitle.Text = WindowSettings.Subtitle
@@ -849,21 +1794,33 @@ function Aurexis:CreateWindow(WindowSettings)
 
 	if WindowSettings.LoadingEnabled then
 		task.wait(0.3)
+		local fadeTween = TweenInfo.new(0.35, Enum.EasingStyle.Exponential)
 		TweenService:Create(LoadingFrame.Frame.Frame.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-		TweenService:Create(LoadingFrame.Frame.ImageLabel, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
+		TweenService:Create(LoadingFrame.Version, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+		if LayeredLoadingSpinner then
+			LayeredLoadingSpinner:SetVisible(true, fadeTween)
+			LayeredLoadingSpinner:Start()
+		else
+			TweenService:Create(LoadingFrame.Frame.ImageLabel, fadeTween, {ImageTransparency = 0}):Play()
+			TweenService:Create(LoadingFrame.Frame.ImageLabel, TweenInfo.new(1.7, Enum.EasingStyle.Back, Enum.EasingDirection.Out, 2, false, 0.2), {Rotation = 450}):Play()
+		end
 		task.wait(0.05)
 		TweenService:Create(LoadingFrame.Frame.Frame.Subtitle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-		TweenService:Create(LoadingFrame.Version, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-		task.wait(0.29)
-		TweenService:Create(LoadingFrame.Frame.ImageLabel, TweenInfo.new(1.7, Enum.EasingStyle.Back, Enum.EasingDirection.Out, 2, false, 0.2), {Rotation = 450}):Play()
 
 		task.wait(3.32)
 
 		TweenService:Create(LoadingFrame.Frame.Frame.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-		TweenService:Create(LoadingFrame.Frame.ImageLabel, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
+		if LayeredLoadingSpinner then
+			LayeredLoadingSpinner:SetVisible(false, fadeTween)
+		else
+			TweenService:Create(LoadingFrame.Frame.ImageLabel, fadeTween, {ImageTransparency = 1}):Play()
+		end
 		task.wait(0.05)
 		TweenService:Create(LoadingFrame.Frame.Frame.Subtitle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
 		TweenService:Create(LoadingFrame.Version, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+		if LayeredLoadingSpinner then
+			LayeredLoadingSpinner:Stop()
+		end
 		wait(0.3)
 		TweenService:Create(LoadingFrame, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
 	end
@@ -874,7 +1831,10 @@ function Aurexis:CreateWindow(WindowSettings)
 	TweenService:Create(Main.Title.subtitle, TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
 	TweenService:Create(Main.Logo, TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play()
 	TweenService:Create(Navigation.Player.icon.ImageLabel, TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play()
-	TweenService:Create(Navigation.Player.icon.UIStroke, TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0}):Play()
+	local navIconStroke = Navigation.Player.icon:FindFirstChildWhichIsA("UIStroke")
+	if navIconStroke then
+		TweenService:Create(navIconStroke, TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0}):Play()
+	end
 	TweenService:Create(Main.Line, TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
 	wait(0.4)
 	LoadingFrame.Visible = false
@@ -882,6 +1842,25 @@ function Aurexis:CreateWindow(WindowSettings)
 	Draggable(Dragger, Main)
 	Draggable(AurexisUI.MobileSupport, AurexisUI.MobileSupport)
 	if dragBar then Draggable(dragInteract, Main, true, 255) end
+
+	-- Recalculate window size when orientation / viewport changes
+	local function updateWindowSizeForViewport()
+		computeWindowSizes()
+		if Window.Size then
+			-- minimized
+			Main.Size = MinSize
+		else
+			Main.Size = MainSize
+		end
+		Main.Parent.ShadowHolder.Size = Main.Size
+	end
+
+	if Camera then
+		Camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateWindowSizeForViewport)
+	end
+
+	-- Block camera movement on mobile while main window is open
+	setMobileInputBlocked(true)
 
 	Elements.Template.LayoutOrder = 1000000000
 	Elements.Template.Visible = false
@@ -894,7 +1873,8 @@ function Aurexis:CreateWindow(WindowSettings)
 	
 -- HomeTab laden und registrieren
 local HomeTabModule = requireRemote("src/components/home-tab.lua")
-
+local attachSectionControls = requireRemote("src/components/section-controls.lua")
+local attachTabControls = requireRemote("src/components/tab-controls.lua")
 HomeTabModule(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween, Release, isStudio)
 
 -- HomeTab jetzt ERSTELLEN (sonst bleibt alles leer)
@@ -947,9 +1927,14 @@ FirstTab = false
 		TabPage.Parent = Elements
 
 		function Tab:Activate()
-			tween(TabButton.ImageLabel, {ImageColor3 = Color3.fromRGB(255,255,255)})
+			if TabButton.ImageLabel then
+				tween(TabButton.ImageLabel, {ImageColor3 = Color3.fromRGB(255,255,255)})
+			end
 			tween(TabButton, {BackgroundTransparency = 0})
-			tween(TabButton.UIStroke, {Transparency = 0.41})
+			local buttonStroke = TabButton:FindFirstChildWhichIsA("UIStroke")
+			if buttonStroke then
+				tween(buttonStroke, {Transparency = 0.41})
+			end
 
 			Elements.UIPageLayout:JumpTo(TabPage)
 
@@ -957,9 +1942,14 @@ FirstTab = false
 
 			for _, OtherTabButton in ipairs(Navigation.Tabs:GetChildren()) do
 				if OtherTabButton.Name ~= "InActive Template" and OtherTabButton.ClassName == "Frame" and OtherTabButton ~= TabButton then
-					tween(OtherTabButton.ImageLabel, {ImageColor3 = Color3.fromRGB(221,221,221)})
+					if OtherTabButton.ImageLabel then
+						tween(OtherTabButton.ImageLabel, {ImageColor3 = Color3.fromRGB(221,221,221)})
+					end
 					tween(OtherTabButton, {BackgroundTransparency = 1})
-					tween(OtherTabButton.UIStroke, {Transparency = 1})
+					local otherStroke = OtherTabButton:FindFirstChildWhichIsA("UIStroke")
+					if otherStroke then
+						tween(otherStroke, {Transparency = 1})
+					end
 				end
 
 			end
@@ -974,6 +1964,9 @@ FirstTab = false
 		task.wait(0.01)
 
 		TabButton.Interact.MouseButton1Click:Connect(function()
+			if closeDialogState and closeDialogState.host then
+				return
+			end
 			Tab:Activate()
 		end)
 
@@ -1005,3858 +1998,48 @@ FirstTab = false
 				Sectiont:Destroy()
 			end
 
-			-- Divider
-			function Section:CreateDivider()
-				TabPage.Position = UDim2.new(0,0,0,28)
-				local b = Elements.Template.Divider:Clone()
-				b.Parent = TabPage
-				b.Size = UDim2.new(1,0,0,18)
-				b.Line.BackgroundTransparency = 1
-				tween(b.Line, {BackgroundTransparency = 0})
-			end
-
-			-- Button
-			function Section:CreateButton(ButtonSettings)
-				TabPage.Position = UDim2.new(0,0,0,28)
-
-				ButtonSettings = Kwargify({
-					Name = "Button",
-					Description = nil,
-					Callback = function()
-
-					end,
-				}, ButtonSettings or {})
-
-				local ButtonV = {
-					Hover = false,
-					Settings = ButtonSettings
-				}
-
-
-				local Button
-				if ButtonSettings.Description == nil and ButtonSettings.Description ~= "" then
-					Button = Elements.Template.Button:Clone()
-				else
-					Button = Elements.Template.ButtonDesc:Clone()
-				end
-				Button.Name = ButtonSettings.Name
-				Button.Title.Text = ButtonSettings.Name
-				if ButtonSettings.Description ~= nil and ButtonSettings.Description ~= "" then
-					Button.Desc.Text = ButtonSettings.Description
-				end
-				Button.Visible = true
-				Button.Parent = TabPage
-
-				Button.UIStroke.Transparency = 1
-				Button.Title.TextTransparency = 1
-				if ButtonSettings.Description ~= nil and ButtonSettings.Description ~= "" then
-					Button.Desc.TextTransparency = 1
-				end
-
-				TweenService:Create(Button, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-				TweenService:Create(Button.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-				TweenService:Create(Button.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()	
-				if ButtonSettings.Description ~= nil and ButtonSettings.Description ~= "" then
-					TweenService:Create(Button.Desc, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()	
-				end
-
-				Button.Interact["MouseButton1Click"]:Connect(function()
-					local Success,Response = pcall(ButtonSettings.Callback)
-
-					if not Success then
-						TweenService:Create(Button, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-						TweenService:Create(Button, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-						TweenService:Create(Button.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-						Button.Title.Text = "Callback Error"
-						print("Aurexis Interface Library | "..ButtonSettings.Name.." Callback Error " ..tostring(Response))
-						wait(0.5)
-						Button.Title.Text = ButtonSettings.Name
-						TweenService:Create(Button, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-						TweenService:Create(Button, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-						TweenService:Create(Button.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-					else
-						tween(Button.UIStroke, {Color = Color3.fromRGB(136, 131, 163)})
-						wait(0.2)
-						if ButtonV.Hover then
-							tween(Button.UIStroke, {Color = Color3.fromRGB(87, 84, 104)})
-						else
-							tween(Button.UIStroke, {Color = Color3.fromRGB(64,61,76)})
-						end
-					end
-				end)
-
-				Button["MouseEnter"]:Connect(function()
-					ButtonV.Hover = true
-					tween(Button.UIStroke, {Color = Color3.fromRGB(87, 84, 104)})
-				end)
-
-				Button["MouseLeave"]:Connect(function()
-					ButtonV.Hover = false
-					tween(Button.UIStroke, {Color = Color3.fromRGB(64,61,76)})
-				end)
-
-				function ButtonV:Set(ButtonSettings2)
-					ButtonSettings2 = Kwargify({
-						Name = ButtonSettings.Name,
-						Description = ButtonSettings.Description,
-						Callback = ButtonSettings.Callback
-					}, ButtonSettings2 or {})
-
-					ButtonSettings = ButtonSettings2
-					ButtonV.Settings = ButtonSettings2
-
-					Button.Name = ButtonSettings.Name
-					Button.Title.Text = ButtonSettings.Name
-					if ButtonSettings.Description ~= nil and ButtonSettings.Description ~= "" and Button.Desc ~= nil then
-						Button.Desc.Text = ButtonSettings.Description
-					end
-				end
-
-				function ButtonV:Destroy()
-					Button.Visible = false
-					Button:Destroy()
-				end
-
-				return ButtonV
-			end
-
-			-- Label
-			function Section:CreateLabel(LabelSettings)
-				TabPage.Position = UDim2.new(0,0,0,28)
-
-				local LabelV = {}
-
-				LabelSettings = Kwargify({
-					Text = "Label",
-					Style = 1
-				}, LabelSettings or {}) 
-
-				LabelV.Settings = LabelSettings
-
-				local Label
-				if LabelSettings.Style == 1 then
-					Label = Elements.Template.Label:Clone()
-				elseif LabelSettings.Style == 2 then
-					Label = Elements.Template.Info:Clone()
-				elseif LabelSettings.Style == 3 then
-					Label = Elements.Template.Warn:Clone()
-				end
-
-				Label.Text.Text = LabelSettings.Text
-				Label.Visible = true
-				Label.Parent = TabPage
-
-				Label.BackgroundTransparency = 1
-				Label.UIStroke.Transparency = 1
-				Label.Text.TextTransparency = 1
-
-				if LabelSettings.Style ~= 1 then
-					TweenService:Create(Label, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.8}):Play()
-				else
-					TweenService:Create(Label, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-				end
-				TweenService:Create(Label.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-				TweenService:Create(Label.Text, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()	
-
-				function LabelV:Set(NewLabel)
-					LabelSettings.Text = NewLabel
-					LabelV.Settings = LabelSettings
-					Label.Text.Text = NewLabel
-				end
-
-				function LabelV:Destroy()
-					Label.Visible = false
-					Label:Destroy()
-				end
-
-				return LabelV
-			end
-
-			-- Paragraph
-			function Section:CreateParagraph(ParagraphSettings)
-				TabPage.Position = UDim2.new(0,0,0,28)
-
-				ParagraphSettings = Kwargify({
-					Title = "Paragraph",
-					Text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
-				}, ParagraphSettings or {})
-
-				local ParagraphV = {
-					Settings = ParagraphSettings
-				}
-
-				local Paragraph = Elements.Template.Paragraph:Clone()
-				Paragraph.Title.Text = ParagraphSettings.Title
-				Paragraph.Text.Text = ParagraphSettings.Text
-				Paragraph.Visible = true
-				Paragraph.Parent = TabPage
-
-				Paragraph.BackgroundTransparency = 1
-				Paragraph.UIStroke.Transparency = 1
-				Paragraph.Title.TextTransparency = 1
-				Paragraph.Text.TextTransparency = 1
-
-				TweenService:Create(Paragraph, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-				TweenService:Create(Paragraph.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-				TweenService:Create(Paragraph.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()	
-				TweenService:Create(Paragraph.Text, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()	
-
-				function ParagraphV:Update()
-					Paragraph.Text.Size = UDim2.new(Paragraph.Text.Size.X.Scale, Paragraph.Text.Size.X.Offset, 0, math.huge)
-					Paragraph.Text.Size = UDim2.new(Paragraph.Text.Size.X.Scale, Paragraph.Text.Size.X.Offset, 0, Paragraph.Text.TextBounds.Y)
-					tween(Paragraph, {Size = UDim2.new(Paragraph.Size.X.Scale, Paragraph.Size.X.Offset, 0, Paragraph.Text.TextBounds.Y + 40)})
-				end
-
-				function ParagraphV:Set(NewParagraphSettings)
-
-					NewParagraphSettings = Kwargify({
-						Title = ParagraphSettings.Title,
-						Text = ParagraphSettings.Text
-					}, NewParagraphSettings or {})
-
-					ParagraphV.Settings = NewParagraphSettings
-
-					Paragraph.Title.Text = NewParagraphSettings.Title
-					Paragraph.Text.Text = NewParagraphSettings.Text
-
-					ParagraphV:Update()
-
-				end
-
-				function ParagraphV:Destroy()
-					Paragraph.Visible = false
-					Paragraph:Destroy()
-				end
-
-				ParagraphV:Update()
-
-				return ParagraphV
-			end
-
-			-- Slider
-			function Section:CreateSlider(SliderSettings, Flag)
-				TabPage.Position = UDim2.new(0,0,0,28)
-				local SliderV = { IgnoreConfig = false, Class = "Slider", Settings = SliderSettings }
-
-				SliderSettings = Kwargify({
-					Name = "Slider",
-					Range = {0, 200},
-					Increment = 1,
-					CurrentValue = 100,
-					Callback = function(Value)
-
-					end,
-				}, SliderSettings or {})
-
-				local SLDragging = false
-				local Slider = Elements.Template.Slider:Clone()
-				Slider.Name = SliderSettings.Name .. " - Slider"
-				Slider.Title.Text = SliderSettings.Name
-				Slider.Visible = true
-				Slider.Parent = TabPage
-
-				Slider.BackgroundTransparency = 1
-				Slider.UIStroke.Transparency = 1
-				Slider.Title.TextTransparency = 1
-
-				TweenService:Create(Slider, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-				TweenService:Create(Slider.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-				TweenService:Create(Slider.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()	
-
-				Slider.Main.Progress.Size =	UDim2.new(0, Slider.Main.AbsoluteSize.X * ((SliderSettings.CurrentValue + SliderSettings.Range[1]) / (SliderSettings.Range[2] - SliderSettings.Range[1])) > 5 and Slider.Main.AbsoluteSize.X * (SliderSettings.CurrentValue / (SliderSettings.Range[2] - SliderSettings.Range[1])) or 5, 1, 0)
-
-				Slider.Value.Text = tostring(SliderSettings.CurrentValue)
-				SliderV.CurrentValue = Slider.Value.Text
-
-				SliderSettings.Callback(SliderSettings.CurrentValue)
-
-				Slider["MouseEnter"]:Connect(function()
-					tween(Slider.UIStroke, {Color = Color3.fromRGB(87, 84, 104)})
-				end)
-
-				Slider["MouseLeave"]:Connect(function()
-					tween(Slider.UIStroke, {Color = Color3.fromRGB(64,61,76)})
-				end)
-
-				Slider.Interact.InputBegan:Connect(function(Input)
-					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then 
-						SLDragging = true 
-					end 
-				end)
-
-				Slider.Interact.InputEnded:Connect(function(Input) 
-					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then 
-						SLDragging = false 
-					end 
-				end)
-
-				Slider.Interact.MouseButton1Down:Connect(function()
-					local Current = Slider.Main.Progress.AbsolutePosition.X + Slider.Main.Progress.AbsoluteSize.X
-					local Start = Current
-					local Location
-					local Loop; Loop = RunService.Stepped:Connect(function()
-						if SLDragging then
-							Location = UserInputService:GetMouseLocation().X
-							Current = Current + 0.025 * (Location - Start)
-
-							if Location < Slider.Main.AbsolutePosition.X then
-								Location = Slider.Main.AbsolutePosition.X
-							elseif Location > Slider.Main.AbsolutePosition.X + Slider.Main.AbsoluteSize.X then
-								Location = Slider.Main.AbsolutePosition.X + Slider.Main.AbsoluteSize.X
-							end
-
-							if Current < Slider.Main.AbsolutePosition.X + 5 then
-								Current = Slider.Main.AbsolutePosition.X + 5
-							elseif Current > Slider.Main.AbsolutePosition.X + Slider.Main.AbsoluteSize.X then
-								Current = Slider.Main.AbsolutePosition.X + Slider.Main.AbsoluteSize.X
-							end
-
-							if Current <= Location and (Location - Start) < 0 then
-								Start = Location
-							elseif Current >= Location and (Location - Start) > 0 then
-								Start = Location
-							end
-							Slider.Main.Progress.Size = UDim2.new(0, Location - Slider.Main.AbsolutePosition.X, 1, 0)
-							local NewValue = SliderSettings.Range[1] + (Location - Slider.Main.AbsolutePosition.X) / Slider.Main.AbsoluteSize.X * (SliderSettings.Range[2] - SliderSettings.Range[1])
-
-							NewValue = math.floor(NewValue / SliderSettings.Increment + 0.5) * (SliderSettings.Increment * 10000000) / 10000000
-
-							Slider.Value.Text = tostring(NewValue)
-
-							if SliderSettings.CurrentValue ~= NewValue then
-								local Success, Response = pcall(function()
-									SliderSettings.Callback(NewValue)
-								end)
-								if not Success then
-									TweenService:Create(Slider, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-									TweenService:Create(Slider, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-									TweenService:Create(Slider.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-									Slider.Title.Text = "Callback Error"
-									print("Aurexis Interface Library | "..SliderSettings.Name.." Callback Error " ..tostring(Response))
-									wait(0.5)
-									Slider.Title.Text = SliderSettings.Name
-									TweenService:Create(Slider, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-									TweenService:Create(Slider, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-									TweenService:Create(Slider.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-								end
-
-								SliderSettings.CurrentValue = NewValue
-								SliderV.CurrentValue = SliderSettings.CurrentValue
-								-- Aurexis.Flags[SliderSettings.Flag] = SliderSettings
-							end
-						else
-							TweenService:Create(Slider.Main.Progress, TweenInfo.new(0.1, Enum.EasingStyle.Back, Enum.EasingDirection.In, 0, false), {Size = UDim2.new(0, Location - Slider.Main.AbsolutePosition.X > 5 and Location - Slider.Main.AbsolutePosition.X or 5, 1, 0)}):Play()
-							Loop:Disconnect()
-						end
-					end)
-				end)
-
-				local function Set(NewVal, bleh)
-
-					NewVal = NewVal or SliderSettings.CurrentValue
-
-					TweenService:Create(Slider.Main.Progress, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.InOut), {Size = UDim2.new(0, Slider.Main.AbsoluteSize.X * ((NewVal + SliderSettings.Range[1]) / (SliderSettings.Range[2] - SliderSettings.Range[1])) > 5 and Slider.Main.AbsoluteSize.X * (NewVal / (SliderSettings.Range[2] - SliderSettings.Range[1])) or 5, 1, 0)}):Play()
-					if not bleh then Slider.Value.Text = tostring(NewVal) end
-					local Success, Response = pcall(function()
-						SliderSettings.Callback(NewVal)
-					end)
-					if not Success then
-						TweenService:Create(Slider, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-						TweenService:Create(Slider, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-						TweenService:Create(Slider.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-						Slider.Title.Text = "Callback Error"
-						print("Aurexis Interface Library | "..SliderSettings.Name.." Callback Error " ..tostring(Response))
-						wait(0.5)
-						Slider.Title.Text = SliderSettings.Name
-						TweenService:Create(Slider, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-						TweenService:Create(Slider, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(30, 33, 40)}):Play()
-						TweenService:Create(Slider.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-					end
-
-					SliderSettings.CurrentValue = NewVal
-					SliderV.CurrentValue = SliderSettings.CurrentValue
-					-- Aurexis.Flags[SliderSettings.Flag] = SliderSettings
-
-				end
-
-				function SliderV:UpdateValue(Value)
-					Set(tonumber(Value))
-				end 
-
-				Slider.Value:GetPropertyChangedSignal("Text"):Connect(function()
-					local text = Slider.Value.Text
-					if not tonumber(text) and text ~= "." then
-						Slider.Value.Text = text:match("[0-9.]*") or ""
-					end
-					if SliderSettings.Range[2] < (tonumber(Slider.Value.Text) or 0) then Slider.Value.Text = SliderSettings.Range[2] end
-					Slider.Value.Size = UDim2.fromOffset(Slider.Value.TextBounds.X, 23)
-					Set(tonumber(Slider.Value.Text), true)
-				end)
-
-				function SliderV:Set(NewSliderSettings)
-					NewSliderSettings = Kwargify({
-						Name = SliderSettings.Name,
-						Range = SliderSettings.Range,
-						Increment = SliderSettings.Increment,
-						CurrentValue = SliderSettings.CurrentValue,
-						Callback = SliderSettings.Callback
-					}, NewSliderSettings or {})
-
-					SliderSettings = NewSliderSettings
-					SliderV.Settings = NewSliderSettings
-
-					Slider.Name = SliderSettings.Name .. " - Slider"
-					Slider.Title.Text = SliderSettings.Name
-
-					Set()
-
-					-- Aurexis.Flags[SliderSettings.Flag] = SliderSettings
-				end
-
-				function SliderV:Destroy()
-					Slider.Visible = false
-					Slider:Destroy()
-				end
-
-				if Flag then
-					Aurexis.Options[Flag] = SliderV
-				end
-
-				AurexisUI.ThemeRemote:GetPropertyChangedSignal("Value"):Connect(function()
-					Slider.Main.color.Color = Aurexis.ThemeGradient
-					Slider.Main.UIStroke.color.Color = Aurexis.ThemeGradient
-				end)
-
-				return SliderV
-
-			end
-
-			-- Toggle
-			function Section:CreateToggle(ToggleSettings, Flag)    
-				TabPage.Position = UDim2.new(0,0,0,28)
-				local ToggleV = { IgnoreConfig = false, Class = "Toggle" }
-
-				ToggleSettings = Kwargify({
-					Name = "Toggle",
-					Description = nil,
-					CurrentValue = false,
-					Callback = function(Value)
-					end,
-				}, ToggleSettings or {})
-
-
-				local Toggle
-
-				if ToggleSettings.Description ~= nil and ToggleSettings.Description ~= "" then
-					Toggle = Elements.Template.ToggleDesc:Clone()
-				else
-					Toggle = Elements.Template.Toggle:Clone()
-				end
-
-				Toggle.Visible = true
-				Toggle.Parent = TabPage
-
-				Toggle.Name = ToggleSettings.Name .. " - Toggle"
-				Toggle.Title.Text = ToggleSettings.Name
-				if ToggleSettings.Description ~= nil and ToggleSettings.Description ~= "" then
-					Toggle.Desc.Text = ToggleSettings.Description
-				end
-
-				Toggle.UIStroke.Transparency = 1
-				Toggle.Title.TextTransparency = 1
-				if ToggleSettings.Description ~= nil and ToggleSettings.Description ~= "" then
-					Toggle.Desc.TextTransparency = 1
-				end
-
-				TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-				if ToggleSettings.Description ~= nil and ToggleSettings.Description ~= "" then
-					TweenService:Create(Toggle.Desc, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-				end
-				TweenService:Create(Toggle.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-				TweenService:Create(Toggle.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()	
-
-				local function Set(bool)
-					if bool then
-						Toggle.toggle.color.Enabled = true
-						tween(Toggle.toggle, {BackgroundTransparency = 0})
-
-						Toggle.toggle.UIStroke.color.Enabled = true
-						tween(Toggle.toggle.UIStroke, {Color = Color3.new(255,255,255)})
-
-						tween(Toggle.toggle.val, {BackgroundColor3 = Color3.fromRGB(255,255,255), Position = UDim2.new(1,-23,0.5,0), BackgroundTransparency = 0.45})
-					else
-						Toggle.toggle.color.Enabled = false
-						Toggle.toggle.UIStroke.color.Enabled = false
-
-						Toggle.toggle.UIStroke.Color = Color3.fromRGB(97,97,97)
-
-						tween(Toggle.toggle, {BackgroundTransparency = 1})
-
-						tween(Toggle.toggle.val, {BackgroundColor3 = Color3.fromRGB(97,97,97), Position = UDim2.new(0,5,0.5,0), BackgroundTransparency = 0})
-					end
-
-					ToggleV.CurrentValue = bool
-				end
-
-				Toggle.Interact.MouseButton1Click:Connect(function()
-					ToggleSettings.CurrentValue = not ToggleSettings.CurrentValue
-					Set(ToggleSettings.CurrentValue)
-
-					local Success, Response = pcall(function()
-						ToggleSettings.Callback(ToggleSettings.CurrentValue)
-					end)
-					if not Success then
-						TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-						TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-						TweenService:Create(Toggle.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-						Toggle.Title.Text = "Callback Error"
-						print("Aurexis Interface Library | "..ToggleSettings.Name.." Callback Error " ..tostring(Response))
-						wait(0.5)
-						Toggle.Title.Text = ToggleSettings.Name
-						TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-						TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-						TweenService:Create(Toggle.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-					end
-				end)
-
-				Toggle["MouseEnter"]:Connect(function()
-					tween(Toggle.UIStroke, {Color = Color3.fromRGB(87, 84, 104)})
-				end)
-
-				Toggle["MouseLeave"]:Connect(function()
-					tween(Toggle.UIStroke, {Color = Color3.fromRGB(64,61,76)})
-				end)
-
-				if ToggleSettings.CurrentValue then
-					Set(ToggleSettings.CurrentValue)
-					local Success, Response = pcall(function()
-						ToggleSettings.Callback(ToggleSettings.CurrentValue)
-					end)
-					if not Success then
-						TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-						TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-						TweenService:Create(Toggle.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-						Toggle.Title.Text = "Callback Error"
-						print("Aurexis Interface Library | "..ToggleSettings.Name.." Callback Error " ..tostring(Response))
-						wait(0.5)
-						Toggle.Title.Text = ToggleSettings.Name
-						TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-						TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-						TweenService:Create(Toggle.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-					end
-				end
-
-				function ToggleV:UpdateState(State)
-					ToggleSettings.CurrentValue = State
-					Set(ToggleSettings.CurrentValue)
-				end
-
-				function ToggleV:Set(NewToggleSettings)
-
-					NewToggleSettings = Kwargify({
-						Name = ToggleSettings.Name,
-						Description = ToggleSettings.Description,
-						CurrentValue = ToggleSettings.CurrentValue,
-						Callback = ToggleSettings.Callback
-					}, NewToggleSettings or {})
-
-					ToggleV.Settings = NewToggleSettings
-					ToggleSettings = NewToggleSettings
-
-					Toggle.Name = ToggleSettings.Name .. " - Toggle"
-					Toggle.Title.Text = ToggleSettings.Name
-					if ToggleSettings.Description ~= nil and ToggleSettings.Description ~= "" and Toggle.Desc ~= nil then
-						Toggle.Desc.Text = ToggleSettings.Description
-					end
-
-					Set(ToggleSettings.CurrentValue)
-
-					ToggleV.CurrentValue = ToggleSettings.CurrentValue
-
-					local Success, Response = pcall(function()
-						ToggleSettings.Callback(ToggleSettings.CurrentValue)
-					end)
-					if not Success then
-						TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-						TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-						TweenService:Create(Toggle.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
-						Toggle.Title.Text = "Callback Error"
-						print("Aurexis Interface Library | "..ToggleSettings.Name.." Callback Error " ..tostring(Response))
-						wait(0.5)
-						Toggle.Title.Text = ToggleSettings.Name
-						TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-						TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-						TweenService:Create(Toggle.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-					end
-				end
-
-				function ToggleV:Destroy()
-					Toggle.Visible = false
-					Toggle:Destroy()
-				end
-
-				AurexisUI.ThemeRemote:GetPropertyChangedSignal("Value"):Connect(function()
-					Toggle.toggle.color.Color = Aurexis.ThemeGradient
-					Toggle.toggle.UIStroke.color.Color = Aurexis.ThemeGradient
-				end)
-
-				if Flag then
-					Aurexis.Options[Flag] = ToggleV
-				end
-
-				return ToggleV
-
-			end
-
-			-- Bind
-			function Section:CreateBind(BindSettings, Flag)
-				TabPage.Position = UDim2.new(0,0,0,28)
-				local BindV = { Class = "Keybind", IgnoreConfig = false, Settings = BindSettings, Active = false }
-
-				BindSettings = Kwargify({
-					Name = "Bind",
-					Description = nil,
-					CurrentBind = "Q",
-					HoldToInteract = false, -- setting this makes the Bind in toggle mode
-					Callback = function(Bind)
-						-- The function that takes place when the Bind is pressed
-						-- The variable (Bind) is a boolean for whether the Bind is being held or not (HoldToInteract needs to be true) or whether the Bind is currently active
-					end,
-
-					OnChangedCallback = function(Bind)
-						-- The function that takes place when the binded key changes
-						-- The variable (Bind) is a Enum.KeyCode for the new Binded Key
-					end,
-				}, BindSettings or {})
-
-				local CheckingForKey = false
-
-				local Bind
-				if BindSettings.Description ~= nil and BindSettings.Description ~= "" then
-					Bind = Elements.Template.BindDesc:Clone()
-				else
-					Bind = Elements.Template.Bind:Clone()
-				end
-
-				Bind.Visible = true
-				Bind.Parent = TabPage
-
-				Bind.Name = BindSettings.Name
-				Bind.Title.Text = BindSettings.Name
-				if BindSettings.Description ~= nil and BindSettings.Description ~= "" then
-					Bind.Desc.Text = BindSettings.Description
-				end
-
-				Bind.Title.TextTransparency = 1
-				if BindSettings.Description ~= nil and BindSettings.Description ~= "" then
-					Bind.Desc.TextTransparency = 1
-				end
-				Bind.BindFrame.BackgroundTransparency = 1
-				Bind.BindFrame.UIStroke.Transparency = 1
-				Bind.BindFrame.BindBox.TextTransparency = 1
-
-				TweenService:Create(Bind, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-				TweenService:Create(Bind.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-				if BindSettings.Description ~= nil and BindSettings.Description ~= "" then
-					TweenService:Create(Bind.Desc, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-				end
-				TweenService:Create(Bind.BindFrame, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.9}):Play()
-				TweenService:Create(Bind.BindFrame.UIStroke, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {Transparency = 0.3}):Play()
-				TweenService:Create(Bind.BindFrame.BindBox, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-
-
-				Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
-				Bind.BindFrame.BindBox.Size = UDim2.new(0, Bind.BindFrame.BindBox.TextBounds.X + 20, 0, 42)
-
-				Bind.BindFrame.BindBox.Focused:Connect(function()
-					CheckingForKey = true
-					Bind.BindFrame.BindBox.Text = ""
-				end)
-
-				Bind.BindFrame.BindBox.FocusLost:Connect(function()
-					CheckingForKey = false
-					if Bind.BindFrame.BindBox.Text == (nil or "") then
-						Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
-					end
-				end)
-
-				Bind["MouseEnter"]:Connect(function()
-					tween(Bind.UIStroke, {Color = Color3.fromRGB(87, 84, 104)})
-				end)
-
-				Bind["MouseLeave"]:Connect(function()
-					tween(Bind.UIStroke, {Color = Color3.fromRGB(64,61,76)})
-				end)
-				UserInputService.InputBegan:Connect(function(input, processed)
-
-					if CheckingForKey then
-						if input.KeyCode ~= Enum.KeyCode.Unknown and input.KeyCode ~= Window.Bind then
-							local SplitMessage = string.split(tostring(input.KeyCode), ".")
-							local NewKeyNoEnum = SplitMessage[3]
-							Bind.BindFrame.BindBox.Text = tostring(NewKeyNoEnum)
-							BindSettings.CurrentBind = tostring(NewKeyNoEnum)
-							local Success, Response = pcall(function()
-								BindSettings.Callback(BindSettings.CurrentBind)
-							end)
-							if not Success then
-								TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-								TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-								TweenService:Create(Bind.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-								Bind.Title.Text = "Callback Error"
-								print("Aurexis Interface Library | "..BindSettings.Name.." Callback Error " ..tostring(Response))
-								wait(0.5)
-								Bind.Title.Text = BindSettings.Name
-								TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-								TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-								TweenService:Create(Bind.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-							end
-							Bind.BindFrame.BindBox:ReleaseFocus()
-						end
-					elseif BindSettings.CurrentBind ~= nil and (input.KeyCode == Enum.KeyCode[BindSettings.CurrentBind] and not processed) then -- Test
-						local Held = true
-						local Connection
-						Connection = input.Changed:Connect(function(prop)
-							if prop == "UserInputState" then
-								Connection:Disconnect()
-								Held = false
-							end
-						end)
-
-						if not BindSettings.HoldToInteract then
-							BindV.Active = not BindV.Active
-							local Success, Response = pcall(function()
-								BindSettings.Callback(BindV.Active)
-							end)
-							if not Success then
-								TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-								TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-								TweenService:Create(Bind.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-								Bind.Title.Text = "Callback Error"
-								print("Aurexis Interface Library | "..BindSettings.Name.." Callback Error " ..tostring(Response))
-								wait(0.5)
-								Bind.Title.Text = BindSettings.Name
-								TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-								TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-								TweenService:Create(Bind.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-							end
-						else
-							wait(0.1)
-							if Held then
-								local Loop; Loop = RunService.Stepped:Connect(function()
-									if not Held then
-										local Success, Response = pcall(function()
-											BindSettings.Callback(false)
-										end)
-										if not Success then
-											TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-											TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-											TweenService:Create(Bind.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-											Bind.Title.Text = "Callback Error"
-											print("Aurexis Interface Library | "..BindSettings.Name.." Callback Error " ..tostring(Response))
-											wait(0.5)
-											Bind.Title.Text = BindSettings.Name
-											TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-											TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-											TweenService:Create(Bind.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-										end 
-										Loop:Disconnect()
-									else
-										local Success, Response = pcall(function()
-											BindSettings.Callback(true)
-										end)
-										if not Success then
-											TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-											TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-											TweenService:Create(Bind.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-											Bind.Title.Text = "Callback Error"
-											print("Aurexis Interface Library | "..BindSettings.Name.." Callback Error " ..tostring(Response))
-											wait(0.5)
-											Bind.Title.Text = BindSettings.Name
-											TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-											TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-											TweenService:Create(Bind.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-										end
-									end
-								end)	
-							end
-						end
-					end
-				end)
-
-				Bind.BindFrame.BindBox:GetPropertyChangedSignal("Text"):Connect(function()
-					TweenService:Create(Bind.BindFrame, TweenInfo.new(0.55, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(0, Bind.BindFrame.BindBox.TextBounds.X + 20, 0, 30)}):Play()
-				end)
-
-				function BindV:Set(NewBindSettings)
-
-					NewBindSettings = Kwargify({
-						Name = BindSettings.Name,
-						Description = BindSettings.Description,
-						CurrentBind =  BindSettings.CurrentBind,
-						HoldToInteract = BindSettings.HoldToInteract,
-						Callback = BindSettings.Callback
-					}, NewBindSettings or {})
-
-					BindV.Settings = NewBindSettings
-					BindSettings = NewBindSettings
-
-					Bind.Name = BindSettings.Name
-					Bind.Title.Text = BindSettings.Name
-					if BindSettings.Description ~= nil and BindSettings.Description ~= "" and Bind.Desc ~= nil then
-						Bind.Desc.Text = BindSettings.Description
-					end
-
-					Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
-					Bind.BindFrame.Size = UDim2.new(0, Bind.BindFrame.BindBox.TextBounds.X + 20, 0, 42)
-
-
-					BindV.CurrentBind = BindSettings.CurrentBind
-				end
-
-				function BindV:Destroy()
-					Bind.Visible = false
-					Bind:Destroy()
-				end
-
-				if Flag then
-					Aurexis.Options[Flag] = BindV
-				end
-
-				-- Aurexis.Flags[BindSettings.Flag] = BindSettings
-
-				return BindV
-
-			end
-
-			-- Dynamic Input
-			function Section:CreateInput(InputSettings, Flag)
-				TabPage.Position = UDim2.new(0,0,0,28)
-				local InputV = { IgnoreConfig = false, Class = "Input", Settings = InputSettings }
-
-				InputSettings = Kwargify({
-					Name = "Dynamic Input",
-					Description = nil,
-					CurrentValue = "",
-					PlaceholderText = "Input Placeholder",
-					RemoveTextAfterFocusLost = false,
-					Numeric = false,
-					Enter = false,
-					MaxCharacters = nil,
-					Callback = function(Text)
-
-					end, -- 52
-				}, InputSettings or {})
-
-				InputV.CurrentValue = InputSettings.CurrentValue
-
-				local descriptionbool
-				if InputSettings.Description ~= nil and InputSettings.Description ~= "" then
-					descriptionbool = true
-				end
-
-				local Input 
-				if descriptionbool then
-					Input = Elements.Template.InputDesc:Clone()
-				else
-					Input = Elements.Template.Input:Clone()
-				end
-
-				Input.Name = InputSettings.Name
-				Input.Title.Text = InputSettings.Name
-				if descriptionbool then Input.Desc.Text = InputSettings.Description end
-				Input.Visible = true
-				Input.Parent = TabPage
-
-				Input.BackgroundTransparency = 1
-				Input.UIStroke.Transparency = 1
-				Input.Title.TextTransparency = 1
-				if descriptionbool then Input.Desc.TextTransparency = 1 end
-				Input.InputFrame.BackgroundTransparency = 1
-				Input.InputFrame.UIStroke.Transparency = 1
-				Input.InputFrame.InputBox.TextTransparency = 1
-
-				TweenService:Create(Input, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-				TweenService:Create(Input.UIStroke, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-				TweenService:Create(Input.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()	
-				if descriptionbool then TweenService:Create(Input.Desc, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play() end
-				TweenService:Create(Input.InputFrame, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.9}):Play()
-				TweenService:Create(Input.InputFrame.UIStroke, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {Transparency = 0.3}):Play()
-				TweenService:Create(Input.InputFrame.InputBox, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-
-				Input.InputFrame.InputBox.PlaceholderText = InputSettings.PlaceholderText
-				Input.InputFrame.Size = UDim2.new(0, Input.InputFrame.InputBox.TextBounds.X + 52, 0, 30)
-
-				Input.InputFrame.InputBox.FocusLost:Connect(function(bleh)
-
-					if InputSettings.Enter then
-						if bleh then
-							local Success, Response = pcall(function()
-								InputSettings.Callback(Input.InputFrame.InputBox.Text)
-								InputV.CurrentValue = Input.InputFrame.InputBox.Text
-							end)
-							if not Success then
-								TweenService:Create(Input, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-								TweenService:Create(Input, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-								TweenService:Create(Input.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-								Input.Title.Text = "Callback Error"
-								print("Aurexis Interface Library | "..InputSettings.Name.." Callback Error " ..tostring(Response))
-								wait(0.5)
-								Input.Title.Text = InputSettings.Name
-								TweenService:Create(Input, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-								TweenService:Create(Input, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-								TweenService:Create(Input.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-							end
-						end
-					end
-
-					if InputSettings.RemoveTextAfterFocusLost then
-						Input.InputFrame.InputBox.Text = ""
-					end
-
-				end)
-
-				if InputSettings.Numeric then
-					Input.InputFrame.InputBox:GetPropertyChangedSignal("Text"):Connect(function()
-						local text = Input.InputFrame.InputBox.Text
-						if not tonumber(text) and text ~= "." then
-							Input.InputFrame.InputBox.Text = text:match("[0-9.]*") or ""
-						end
-					end)
-				end
-
-				Input.InputFrame.InputBox:GetPropertyChangedSignal("Text"):Connect(function()
-					if tonumber(InputSettings.MaxCharacters) then
-						if (#Input.InputFrame.InputBox.Text - 1) == InputSettings.MaxCharacters then
-							Input.InputFrame.InputBox.Text = Input.InputFrame.InputBox.Text:sub(1, InputSettings.MaxCharacters)
-						end
-					end
-					TweenService:Create(Input.InputFrame, TweenInfo.new(0.55, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(0, Input.InputFrame.InputBox.TextBounds.X + 52, 0, 30)}):Play()
-					if not InputSettings.Enter then
-						local Success, Response = pcall(function()
-							InputSettings.Callback(Input.InputFrame.InputBox.Text)
-						end)
-						if not Success then
-							TweenService:Create(Input, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-							TweenService:Create(Input, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-							TweenService:Create(Input.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-							Input.Title.Text = "Callback Error"
-							print("Aurexis Interface Library | "..InputSettings.Name.." Callback Error " ..tostring(Response))
-							wait(0.5)
-							Input.Title.Text = InputSettings.Name
-							TweenService:Create(Input, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-							TweenService:Create(Input, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-							TweenService:Create(Input.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-						end
-					end
-					InputV.CurrentValue = Input.InputFrame.InputBox.Text				
-				end)
-
-				Input["MouseEnter"]:Connect(function()
-					tween(Input.UIStroke, {Color = Color3.fromRGB(87, 84, 104)})
-				end)
-
-				Input["MouseLeave"]:Connect(function()
-					tween(Input.UIStroke, {Color = Color3.fromRGB(64,61,76)})
-				end)
-
-
-				function InputV:Set(NewInputSettings)
-
-					NewInputSettings = Kwargify(InputSettings, NewInputSettings or {})
-
-					InputV.Settings = NewInputSettings
-					InputSettings = NewInputSettings
-
-					Input.Name = InputSettings.Name
-					Input.Title.Text = InputSettings.Name
-					if InputSettings.Description ~= nil and InputSettings.Description ~= "" and Input.Desc ~= nil then
-						Input.Desc.Text = InputSettings.Description
-					end
-
-					Input.InputFrame.InputBox:CaptureFocus()
-					Input.InputFrame.InputBox.Text = tostring(InputSettings.CurrentValue)
-					Input.InputFrame.InputBox:ReleaseFocus()
-					Input.InputFrame.Size = UDim2.new(0, Input.InputFrame.InputBox.TextBounds.X + 52, 0, 42)
-
-					InputV.CurrentValue = InputSettings.CurrentValue
-				end
-
-				function InputV:Destroy()
-					Input.Visible = false
-					Input:Destroy()
-				end
-
-				if Flag then
-					Aurexis.Options[Flag] = InputV
-				end
-
-
-				return InputV
-
-			end
-
-			-- Dropdown
-			function Section:CreateDropdown(DropdownSettings, Flag)
-				TabPage.Position = UDim2.new(0,0,0,28)
-				local DropdownV = { IgnoreConfig = false, Class = "Dropdown", Settings = DropdownSettings}
-
-				DropdownSettings = Kwargify({
-					Name = "Dropdown",
-					Description = nil,
-					Options = {"Option 1", "Option 2"},
-					CurrentOption = {"Option 1"},
-					MultipleOptions = false,
-					SpecialType = nil, -- currently onl player, might add more soon
-					Callback = function(Options)
-						-- The function that takes place when the selected option is changed
-						-- The variable (Options) is a table of strings for the current selected options or a string if multioptions is false
-					end,
-				}, DropdownSettings or {})
-
-				DropdownV.CurrentOption = DropdownSettings.CurrentOption
-
-				local descriptionbool = false
-				if DropdownSettings.Description ~= nil and DropdownSettings.Description ~= "" then
-					descriptionbool = true
-				end
-				local closedsize
-				local openedsize
-				if descriptionbool then
-					closedsize = 48
-					openedsize = 170
-				elseif not descriptionbool then
-					closedsize = 38
-					openedsize = 160
-				end
-				local opened = false
-
-				local Dropdown
-				if descriptionbool then Dropdown = Elements.Template.DropdownDesc:Clone() else Dropdown = Elements.Template.Dropdown:Clone() end
-
-				Dropdown.Name = DropdownSettings.Name
-				Dropdown.Title.Text = DropdownSettings.Name
-				if descriptionbool then Dropdown.Desc.Text = DropdownSettings.Description end
-
-				Dropdown.Parent = TabPage
-				Dropdown.Visible = true
-
-				local function Toggle()
-					opened = not opened
-					if opened then
-						tween(Dropdown.icon, {Rotation = 180})
-						tween(Dropdown, {Size = UDim2.new(1, -25, 0, openedsize)})
-					else
-						tween(Dropdown.icon, {Rotation = 0})
-						tween(Dropdown, {Size = UDim2.new(1, -25, 0, closedsize)})
-					end
-				end
-
-				local function SafeCallback(param, c2)
-					local Success, Response = pcall(function()
-						DropdownSettings.Callback(param)
-					end)
-					if not Success then
-						TweenService:Create(Dropdown, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-						TweenService:Create(Dropdown, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-						TweenService:Create(Dropdown.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-						Dropdown.Title.Text = "Callback Error"
-						print("Aurexis Interface Library | "..DropdownSettings.Name.." Callback Error " ..tostring(Response))
-						wait(0.5)
-						Dropdown.Title.Text = DropdownSettings.Name
-						TweenService:Create(Dropdown, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-						TweenService:Create(Dropdown, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-						TweenService:Create(Dropdown.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-					end
-					if Success and c2 then
-						c2()
-					end
-				end
-
-				-- fixed by justhey
-				Dropdown.Selected:GetPropertyChangedSignal("Text"):Connect(function()
-					local text = Dropdown.Selected.Text:lower()
-					for _, Item in ipairs(Dropdown.List:GetChildren()) do
-						if Item:IsA("TextLabel") and Item.Name ~= "Template" then
-							Item.Visible = text == "" or string.find(Item.Name:lower(), text, 1, true) ~= nil
-						end
-					end
-				end)
-
-
-				local function Clear()
-					for _, option in ipairs(Dropdown.List:GetChildren()) do
-						if option.ClassName == "TextLabel" and option.Name ~= "Template" then
-							option:Destroy()
-						end
-					end
-				end
-
-				local function ActivateColorSingle(name)
-					for _, Option in pairs(Dropdown.List:GetChildren()) do
-						if Option.ClassName == "TextLabel" and Option.Name ~= "Template" then
-							tween(Option, {BackgroundTransparency = 0.98})
-						end
-					end
-
-					Toggle()
-					tween(Dropdown.List[name], {BackgroundTransparency = 0.95, TextColor3 = Color3.fromRGB(240,240,240)})
-				end
-
-				local function Refresh()
-					Clear()
-					for i,v in pairs(DropdownSettings.Options) do
-						local Option = Dropdown.List.Template:Clone()
-						local optionhover = false
-						Option.Text = v
-						if v == "Template" then v = "Template (Name)" end
-						Option.Name = v
-						Option.Interact.MouseButton1Click:Connect(function()
-							local bleh
-							if DropdownSettings.MultipleOptions then
-								if table.find(DropdownSettings.CurrentOption, v) then
-									RemoveTable(DropdownSettings.CurrentOption, v)
-									DropdownV.CurrentOption = DropdownSettings.CurrentOption
-									if not optionhover then
-										tween(Option, {TextColor3 = Color3.fromRGB(200,200,200)})
-									end
-									tween(Option, {BackgroundTransparency = 0.98})
-								else
-									table.insert(DropdownSettings.CurrentOption, v)
-									DropdownV.CurrentOption = DropdownSettings.CurrentOption
-									tween(Option, {TextColor3 = Color3.fromRGB(240,240,240), BackgroundTransparency = 0.95})
-								end
-								bleh = DropdownSettings.CurrentOption
-							else
-								DropdownSettings.CurrentOption = {v}
-								bleh = v
-								DropdownV.CurrentOption = bleh
-								ActivateColorSingle(v)
-							end
-
-							SafeCallback(bleh, function()
-								if DropdownSettings.MultipleOptions then
-									if DropdownSettings.CurrentOption and type(DropdownSettings.CurrentOption) == "table" then
-										if #DropdownSettings.CurrentOption == 1 then
-											Dropdown.Selected.PlaceholderText = DropdownSettings.CurrentOption[1]
-										elseif #DropdownSettings.CurrentOption == 0 then
-											Dropdown.Selected.PlaceholderText = "None"
-										else
-											Dropdown.Selected.PlaceholderText = unpackt(DropdownSettings.CurrentOption)
-										end
-									else
-										DropdownSettings.CurrentOption = {}
-										Dropdown.Selected.PlaceholderText = "None"
-									end
-								end
-								if not DropdownSettings.MultipleOptions then
-									Dropdown.Selected.PlaceholderText = DropdownSettings.CurrentOption[1] or "None"
-								end
-								Dropdown.Selected.Text = ""
-							end)
-						end)
-						Option.Visible = true
-						Option.Parent = Dropdown.List
-						Option.MouseEnter:Connect(function()
-							optionhover = true
-							if Option.BackgroundTransparency == 0.95 then
-								return
-							else
-								tween(Option, {TextColor3 = Color3.fromRGB(240,240,240)})
-							end
-						end)
-						Option.MouseLeave:Connect(function()
-							optionhover = false
-							if Option.BackgroundTransparency == 0.95 then
-								return
-							else
-								tween(Option, {TextColor3 = Color3.fromRGB(200,200,200)})
-							end
-						end)	
-					end
-				end
-
-				local function PlayerTableRefresh()
-					for i,v in pairs(DropdownSettings.Options) do
-						table.remove(DropdownSettings.Options, i)
-					end
-
-					for i,v in pairs(Players:GetChildren()) do
-						table.insert(DropdownSettings.Options, v.Name)
-					end
-				end
-
-				Dropdown.Interact.MouseButton1Click:Connect(function()
-					Toggle()
-				end)
-
-				Dropdown["MouseEnter"]:Connect(function()
-					tween(Dropdown.UIStroke, {Color = Color3.fromRGB(87, 84, 104)})
-				end)
-
-				Dropdown["MouseLeave"]:Connect(function()
-					tween(Dropdown.UIStroke, {Color = Color3.fromRGB(64,61,76)})
-				end)
-
-				if DropdownSettings.SpecialType == "Player" then
-
-					for i,v in pairs(DropdownSettings.Options) do
-						table.remove(DropdownSettings.Options, i)
-					end
-					PlayerTableRefresh()
-					DropdownSettings.CurrentOption = DropdownSettings.Options[1]
-
-					Players.PlayerAdded:Connect(function() PlayerTableRefresh() end)
-					Players.PlayerRemoving:Connect(function() PlayerTableRefresh() end)
-
-				end
-
-				Refresh()
-
-				if DropdownSettings.CurrentOption then
-					if type(DropdownSettings.CurrentOption) == "string" then
-						DropdownSettings.CurrentOption = {DropdownSettings.CurrentOption}
-					end
-					if not DropdownSettings.MultipleOptions and type(DropdownSettings.CurrentOption) == "table" then
-						DropdownSettings.CurrentOption = {DropdownSettings.CurrentOption[1]}
-					end
-				else
-					DropdownSettings.CurrentOption = {}
-				end
-
-				local bleh, ind = nil,0
-				for i,v in pairs(DropdownSettings.CurrentOption) do
-					ind = ind + 1
-				end
-				if ind == 1 then bleh = DropdownSettings.CurrentOption[1] else bleh = DropdownSettings.CurrentOption end
-				SafeCallback(bleh)
-				if type(bleh) == "string" then 
-					tween(Dropdown.List[bleh], {TextColor3 = Color3.fromRGB(240,240,240), BackgroundTransparency = 0.95})
-				else
-					for i,v in pairs(bleh) do
-						tween(Dropdown.List[v], {TextColor3 = Color3.fromRGB(240,240,240), BackgroundTransparency = 0.95})
-					end
-				end
-
-				if DropdownSettings.MultipleOptions then
-					if DropdownSettings.CurrentOption and type(DropdownSettings.CurrentOption) == "table" then
-						if #DropdownSettings.CurrentOption == 1 then
-							Dropdown.Selected.PlaceholderText = DropdownSettings.CurrentOption[1]
-						elseif #DropdownSettings.CurrentOption == 0 then
-							Dropdown.Selected.PlaceholderText = "None"
-						else
-							Dropdown.Selected.PlaceholderText = unpackt(DropdownSettings.CurrentOption)
-						end
-					else
-						DropdownSettings.CurrentOption = {}
-						Dropdown.Selected.PlaceholderText = "None"
-					end
-					for _, name in pairs(DropdownSettings.CurrentOption) do
-						tween(Dropdown.List[name], {TextColor3 = Color3.fromRGB(227,227,227), BackgroundTransparency = 0.95})
-					end
-				else
-					Dropdown.Selected.PlaceholderText = DropdownSettings.CurrentOption[1] or "None"
-				end
-				Dropdown.Selected.Text = ""
-
-				function DropdownV:Set(NewDropdownSettings)
-					NewDropdownSettings = Kwargify(DropdownSettings, NewDropdownSettings or {})
-
-					DropdownV.Settings = NewDropdownSettings
-					DropdownSettings = NewDropdownSettings
-
-					Dropdown.Name = DropdownSettings.Name
-					Dropdown.Title.Text = DropdownSettings.Name
-					if DropdownSettings.Description ~= nil and DropdownSettings.Description ~= "" and Dropdown.Desc ~= nil then
-						Dropdown.Desc.Text = DropdownSettings.Description
-					end
-
-					if DropdownSettings.SpecialType == "Player" then
-
-						for i,v in pairs(DropdownSettings.Options) do
-							table.remove(DropdownSettings.Options, i)
-						end
-						PlayerTableRefresh()
-						DropdownSettings.CurrentOption = DropdownSettings.Options[1]                    
-						Players.PlayerAdded:Connect(function() PlayerTableRefresh() end)
-						Players.PlayerRemoving:Connect(function() PlayerTableRefresh() end)
-
-					end
-
-					Refresh()
-
-					if DropdownSettings.CurrentOption then
-						if type(DropdownSettings.CurrentOption) == "string" then
-							DropdownSettings.CurrentOption = {DropdownSettings.CurrentOption}
-						end
-						if not DropdownSettings.MultipleOptions and type(DropdownSettings.CurrentOption) == "table" then
-							DropdownSettings.CurrentOption = {DropdownSettings.CurrentOption[1]}
-						end
-					else
-						DropdownSettings.CurrentOption = {}
-					end
-
-					local bleh, ind = nil,0
-					for i,v in pairs(DropdownSettings.CurrentOption) do
-						ind = ind + 1
-					end
-					if ind == 1 then bleh = DropdownSettings.CurrentOption[1] else bleh = DropdownSettings.CurrentOption end
-					SafeCallback(bleh)
-					for _, Option in pairs(Dropdown.List:GetChildren()) do
-						if Option.ClassName == "TextLabel" then
-							tween(Option, {TextColor3 = Color3.fromRGB(200,200,200), BackgroundTransparency = 0.98})
-						end
-					end
-					tween(Dropdown.List[bleh], {TextColor3 = Color3.fromRGB(240,240,240), BackgroundTransparency = 0.95})
-
-					if DropdownSettings.MultipleOptions then
-						if DropdownSettings.CurrentOption and type(DropdownSettings.CurrentOption) == "table" then
-							if #DropdownSettings.CurrentOption == 1 then
-								Dropdown.Selected.PlaceholderText = DropdownSettings.CurrentOption[1]
-							elseif #DropdownSettings.CurrentOption == 0 then
-								Dropdown.Selected.PlaceholderText = "None"
-							else
-								Dropdown.Selected.PlaceholderText = unpackt(DropdownSettings.CurrentOption)
-							end
-						else
-							DropdownSettings.CurrentOption = {}
-							Dropdown.Selected.PlaceholderText = "None"
-						end
-						for _, name in pairs(DropdownSettings.CurrentOption) do
-							tween(Dropdown.List[name], {TextColor3 = Color3.fromRGB(227,227,227), BackgroundTransparency = 0.95})
-						end
-					else
-						Dropdown.Selected.PlaceholderText = DropdownSettings.CurrentOption[1] or "None"
-					end
-					Dropdown.Selected.Text = ""
-
-					-- Aurexis.Flags[DropdownSettings.Flag] = DropdownSettings
-
-				end
-
-				function DropdownV:Destroy()
-					Dropdown.Visible = false
-					Dropdown:Destroy()
-				end
-
-				if Flag then
-					Aurexis.Options[Flag] = DropdownV
-				end
-
-				-- Aurexis.Flags[DropdownSettings.Flag] = DropdownSettings
-
-				return DropdownV
-
-			end
-
-			-- Color Picker
-			function Section:CreateColorPicker(ColorPickerSettings, Flag) -- by Rayfield/Throit
-				TabPage.Position = UDim2.new(0,0,0,28)
-				local ColorPickerV = {IgnoreClass = false, Class = "Colorpicker", Settings = ColorPickerSettings}
-
-				ColorPickerSettings = Kwargify({
-					Name = "Color Picker",
-					Color = Color3.fromRGB(255,255,255),
-					Callback = function(Value)
-						-- The function that takes place every time the color picker is moved/changed
-						-- The variable (Value) is a Color3fromRGB value based on which color is selected
-					end
-				}, ColorPickerSettings or {})
-
-				local function Color3ToHex(color)
-					return string.format("#%02X%02X%02X", math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255))
-				end
-
-				ColorPickerV.Color = Color3ToHex(ColorPickerSettings.Color)
-
-				local closedsize = UDim2.new(0, 75, 0, 22)
-				local openedsize = UDim2.new(0, 219, 0, 129)
-
-				local ColorPicker = Elements.Template.ColorPicker:Clone()
-				local Background = ColorPicker.CPBackground
-				local Display = Background.Display
-				local Main = Background.MainCP
-				local Slider = ColorPicker.ColorSlider
-
-				ColorPicker.Name = ColorPickerSettings.Name
-				ColorPicker.Title.Text = ColorPickerSettings.Name
-				ColorPicker.Visible = true
-				ColorPicker.Parent = TabPage
-				ColorPicker.Size = UDim2.new(1.042, -25,0, 38)
-				Background.Size = closedsize
-				Display.BackgroundTransparency = 0
-
-				ColorPicker["MouseEnter"]:Connect(function()
-					tween(ColorPicker.UIStroke, {Color = Color3.fromRGB(87, 84, 104)})
-				end)
-				ColorPicker["MouseLeave"]:Connect(function()
-					tween(ColorPicker.UIStroke, {Color = Color3.fromRGB(64,61,76)})
-				end)
-
-				local function SafeCallback(param, c2)
-					local Success, Response = pcall(function()
-						ColorPickerSettings.Callback(param)
-					end)
-					if not Success then
-						TweenService:Create(ColorPicker, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-						TweenService:Create(ColorPicker, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-						TweenService:Create(ColorPicker.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-						ColorPicker.Title.Text = "Callback Error"
-						print("Aurexis Interface Library | "..ColorPickerSettings.Name.." Callback Error " ..tostring(Response))
-						wait(0.5)
-						ColorPicker.Title.Text = ColorPickerSettings.Name
-						TweenService:Create(ColorPicker, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-						TweenService:Create(ColorPicker, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-						TweenService:Create(ColorPicker.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-					end
-					if Success and c2 then
-						c2()
-					end
-				end
-
-				local opened = false
-
-				local mouse = game.Players.LocalPlayer:GetMouse()
-				Main.Image = "http://www.roblox.com/asset/?id=11415645739"
-				local mainDragging = false 
-				local sliderDragging = false 
-				ColorPicker.Interact.MouseButton1Down:Connect(function()
-					if not opened then
-						opened = true 
-						tween(ColorPicker, {Size = UDim2.new( 1.042, -25,0, 165)}, nil, TweenInfo.new(0.6, Enum.EasingStyle.Exponential))
-						tween(Background, {Size = openedsize})
-						tween(Display, {BackgroundTransparency = 1})
-					else
-						opened = false
-						tween(ColorPicker, {Size = UDim2.new(1.042, -25,0, 38)}, nil, TweenInfo.new(0.6, Enum.EasingStyle.Exponential))
-						tween(Background, {Size = closedsize})
-						tween(Display, {BackgroundTransparency = 0})
-					end
-				end)
-				UserInputService.InputEnded:Connect(function(input, gameProcessed) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
-						mainDragging = false
-						sliderDragging = false
-					end end)
-				Main.MouseButton1Down:Connect(function()
-					if opened then
-						mainDragging = true 
-					end
-				end)
-				Main.MainPoint.MouseButton1Down:Connect(function()
-					if opened then
-						mainDragging = true 
-					end
-				end)
-				Slider.MouseButton1Down:Connect(function()
-					sliderDragging = true 
-				end)
-				Slider.SliderPoint.MouseButton1Down:Connect(function()
-					sliderDragging = true 
-				end)
-				local h,s,v = ColorPickerSettings.Color:ToHSV()
-				local color = Color3.fromHSV(h,s,v) 
-				local r,g,b = math.floor((h*255)+0.5),math.floor((s*255)+0.5),math.floor((v*255)+0.5)
-				local hex = string.format("#%02X%02X%02X",color.R*0xFF,color.G*0xFF,color.B*0xFF)
-				ColorPicker.HexInput.InputBox.Text = hex
-				local function setDisplay(hp,sp,vp)
-					--Main
-					Main.MainPoint.Position = UDim2.new(s,-Main.MainPoint.AbsoluteSize.X/2,1-v,-Main.MainPoint.AbsoluteSize.Y/2)
-					Main.MainPoint.ImageColor3 = Color3.fromHSV(hp,sp,vp)
-					Background.BackgroundColor3 = Color3.fromHSV(hp,1,1)
-					Display.BackgroundColor3 = Color3.fromHSV(hp,sp,vp)
-					--Slider 
-					local x = hp * Slider.AbsoluteSize.X
-					Slider.SliderPoint.Position = UDim2.new(0,x-Slider.SliderPoint.AbsoluteSize.X/2,0.5,0)
-					Slider.SliderPoint.ImageColor3 = Color3.fromHSV(hp,1,1)
-					local color = Color3.fromHSV(hp,sp,vp) 
-					local r,g,b = math.floor((color.R*255)+0.5),math.floor((color.G*255)+0.5),math.floor((color.B*255)+0.5)
-					ColorPicker.RInput.InputBox.Text = tostring(r)
-					ColorPicker.GInput.InputBox.Text = tostring(g)
-					ColorPicker.BInput.InputBox.Text = tostring(b)
-					hex = string.format("#%02X%02X%02X",color.R*0xFF,color.G*0xFF,color.B*0xFF)
-					ColorPicker.HexInput.InputBox.Text = hex
-				end
-				setDisplay(h,s,v)
-				ColorPicker.HexInput.InputBox.FocusLost:Connect(function()
-					if not pcall(function()
-							local r, g, b = string.match(ColorPicker.HexInput.InputBox.Text, "^#?(%w%w)(%w%w)(%w%w)$")
-							local rgbColor = Color3.fromRGB(tonumber(r, 16),tonumber(g, 16), tonumber(b, 16))
-							h,s,v = rgbColor:ToHSV()
-							hex = ColorPicker.HexInput.InputBox.Text
-							setDisplay()
-							ColorPickerSettings.Color = rgbColor
-						end) 
-					then 
-						ColorPicker.HexInput.InputBox.Text = hex 
-					end
-					local r,g,b = math.floor((h*255)+0.5),math.floor((s*255)+0.5),math.floor((v*255)+0.5)
-					ColorPickerSettings.Color = Color3.fromRGB(r,g,b)
-					SafeCallback( Color3.fromRGB(r,g,b))
-				end)
-				--RGB
-				local function rgbBoxes(box,toChange)
-					local value = tonumber(box.Text) 
-					local color = Color3.fromHSV(h,s,v) 
-					local oldR,oldG,oldB = math.floor((color.R*255)+0.5),math.floor((color.G*255)+0.5),math.floor((color.B*255)+0.5)
-					local save 
-					if toChange == "R" then save = oldR;oldR = value elseif toChange == "G" then save = oldG;oldG = value else save = oldB;oldB = value end
-					if value then 
-						value = math.clamp(value,0,255)
-						h,s,v = Color3.fromRGB(oldR,oldG,oldB):ToHSV()
-						setDisplay()
-					else 
-						box.Text = tostring(save)
-					end
-					local r,g,b = math.floor((color.R*255)+0.5),math.floor((color.G*255)+0.5),math.floor((color.B*255)+0.5)
-					ColorPickerSettings.Color = Color3.fromRGB(r,g,b)
-				end
-				ColorPicker.RInput.InputBox.FocusLost:connect(function()
-					rgbBoxes(ColorPicker.RInput.InputBox,"R")
-					SafeCallback(Color3.fromRGB(r,g,b))
-				end)
-				ColorPicker.GInput.InputBox.FocusLost:connect(function()
-					rgbBoxes(ColorPicker.GInput.InputBox,"G")
-					SafeCallback(Color3.fromRGB(r,g,b))
-				end)
-				ColorPicker.BInput.InputBox.FocusLost:connect(function()
-					rgbBoxes(ColorPicker.BInput.InputBox,"B")
-					SafeCallback(Color3.fromRGB(r,g,b))
-				end)
-				RunService.RenderStepped:connect(function()
-					if mainDragging then 
-						local localX = math.clamp(mouse.X-Main.AbsolutePosition.X,0,Main.AbsoluteSize.X)
-						local localY = math.clamp(mouse.Y-Main.AbsolutePosition.Y,0,Main.AbsoluteSize.Y)
-						Main.MainPoint.Position = UDim2.new(0,localX-Main.MainPoint.AbsoluteSize.X/2,0,localY-Main.MainPoint.AbsoluteSize.Y/2)
-						s = localX / Main.AbsoluteSize.X
-						v = 1 - (localY / Main.AbsoluteSize.Y)
-						Display.BackgroundColor3 = Color3.fromHSV(h,s,v)
-						Main.MainPoint.ImageColor3 = Color3.fromHSV(h,s,v)
-						Background.BackgroundColor3 = Color3.fromHSV(h,1,1)
-						local color = Color3.fromHSV(h,s,v) 
-						local r,g,b = math.floor((color.R*255)+0.5),math.floor((color.G*255)+0.5),math.floor((color.B*255)+0.5)
-						ColorPicker.RInput.InputBox.Text = tostring(r)
-						ColorPicker.GInput.InputBox.Text = tostring(g)
-						ColorPicker.BInput.InputBox.Text = tostring(b)
-						ColorPicker.HexInput.InputBox.Text = string.format("#%02X%02X%02X",color.R*0xFF,color.G*0xFF,color.B*0xFF)
-						SafeCallback(Color3.fromRGB(r,g,b))
-						ColorPickerSettings.Color = Color3.fromRGB(r,g,b)
-						ColorPickerV.Color = ColorPickerSettings.Color
-					end
-					if sliderDragging then 
-						local localX = math.clamp(mouse.X-Slider.AbsolutePosition.X,0,Slider.AbsoluteSize.X)
-						h = localX / Slider.AbsoluteSize.X
-						Display.BackgroundColor3 = Color3.fromHSV(h,s,v)
-						Slider.SliderPoint.Position = UDim2.new(0,localX-Slider.SliderPoint.AbsoluteSize.X/2,0.5,0)
-						Slider.SliderPoint.ImageColor3 = Color3.fromHSV(h,1,1)
-						Background.BackgroundColor3 = Color3.fromHSV(h,1,1)
-						Main.MainPoint.ImageColor3 = Color3.fromHSV(h,s,v)
-						local color = Color3.fromHSV(h,s,v) 
-						local r,g,b = math.floor((color.R*255)+0.5),math.floor((color.G*255)+0.5),math.floor((color.B*255)+0.5)
-						ColorPicker.RInput.InputBox.Text = tostring(r)
-						ColorPicker.GInput.InputBox.Text = tostring(g)
-						ColorPicker.BInput.InputBox.Text = tostring(b)
-						ColorPicker.HexInput.InputBox.Text = string.format("#%02X%02X%02X",color.R*0xFF,color.G*0xFF,color.B*0xFF)
-						SafeCallback(Color3.fromRGB(r,g,b))
-						ColorPickerSettings.Color = Color3.fromRGB(r,g,b)
-						ColorPickerV.Color = ColorPickerSettings.Color
-					end
-				end)
-
-				function ColorPickerV:Set(NewColorPickerSettings)
-
-					NewColorPickerSettings = Kwargify(ColorPickerSettings, NewColorPickerSettings or {})
-
-					ColorPickerV.Settings = NewColorPickerSettings
-					ColorPickerSettings = NewColorPickerSettings
-
-					ColorPicker.Name = ColorPickerSettings.Name
-					ColorPicker.Title.Text = ColorPickerSettings.Name
-					ColorPicker.Visible = true
-
-					local h,s,v = ColorPickerSettings.Color:ToHSV()
-					local color = Color3.fromHSV(h,s,v) 
-					local r,g,b = math.floor((color.R*255)+0.5),math.floor((color.G*255)+0.5),math.floor((color.B*255)+0.5)
-					local hex = string.format("#%02X%02X%02X",color.R*0xFF,color.G*0xFF,color.B*0xFF)
-					ColorPicker.HexInput.InputBox.Text = hex
-					setDisplay(h,s,v)
-					SafeCallback(Color3.fromRGB(r,g,b))
-
-					ColorPickerV.Color = ColorPickerSettings.Color
-				end
-
-				function ColorPickerV:Destroy()
-					ColorPicker:Destroy()
-				end
-
-				if Flag then
-					Aurexis.Options[Flag] = ColorPickerV
-				end
-
-				SafeCallback(ColorPickerSettings.Color)
-
-				return ColorPickerV
-			end
+			attachSectionControls({
+				Section = Section,
+				TabPage = TabPage,
+				Elements = Elements,
+				TweenService = TweenService,
+				RunService = RunService,
+				UserInputService = UserInputService,
+				Kwargify = Kwargify,
+				RemoveTable = RemoveTable,
+				unpackt = unpackt,
+				Aurexis = Aurexis,
+				AurexisUI = AurexisUI,
+				Window = Window,
+				tween = tween,
+				Players = Players,
+			})
 
 			return Section
 
 		end
 
-		-- Divider
-		function Tab:CreateDivider()
-			local b = Elements.Template.Divider:Clone()
-			b.Parent = TabPage
-			b.Line.BackgroundTransparency = 1
-			tween(b.Line, {BackgroundTransparency = 0})
-		end
+		attachTabControls({
+			Tab = Tab,
+			TabPage = TabPage,
+			Elements = Elements,
+			TweenService = TweenService,
+			RunService = RunService,
+			UserInputService = UserInputService,
+			Kwargify = Kwargify,
+			RemoveTable = RemoveTable,
+			unpackt = unpackt,
+			Aurexis = Aurexis,
+			AurexisUI = AurexisUI,
+			Window = Window,
+			tween = tween,
+			Players = Players,
+			WindowSettings = WindowSettings,
+			PresetGradients = PresetGradients,
+			HttpService = HttpService,
+			isStudio = isStudio,
+		})
 
-		-- Button
-		function Tab:CreateButton(ButtonSettings)
-
-			ButtonSettings = Kwargify({
-				Name = "Button",
-				Description = nil,
-				Callback = function()
-
-				end,
-			}, ButtonSettings or {})
-
-			local ButtonV = {
-				Hover = false,
-				Settings = ButtonSettings
-			}
-
-
-			local Button
-			if ButtonSettings.Description == nil and ButtonSettings.Description ~= "" then
-				Button = Elements.Template.Button:Clone()
-			else
-				Button = Elements.Template.ButtonDesc:Clone()
-			end
-			Button.Name = ButtonSettings.Name
-			Button.Title.Text = ButtonSettings.Name
-			if ButtonSettings.Description ~= nil and ButtonSettings.Description ~= "" then
-				Button.Desc.Text = ButtonSettings.Description
-			end
-			Button.Visible = true
-			Button.Parent = TabPage
-
-			Button.UIStroke.Transparency = 1
-			Button.Title.TextTransparency = 1
-			if ButtonSettings.Description ~= nil and ButtonSettings.Description ~= "" then
-				Button.Desc.TextTransparency = 1
-			end
-
-			TweenService:Create(Button, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-			TweenService:Create(Button.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-			TweenService:Create(Button.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()	
-			if ButtonSettings.Description ~= nil and ButtonSettings.Description ~= "" then
-				TweenService:Create(Button.Desc, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()	
-			end
-
-			Button.Interact["MouseButton1Click"]:Connect(function()
-				local Success,Response = pcall(ButtonSettings.Callback)
-
-				if not Success then
-					TweenService:Create(Button, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-					TweenService:Create(Button, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-					TweenService:Create(Button.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-					Button.Title.Text = "Callback Error"
-					print("Aurexis Interface Library | "..ButtonSettings.Name.." Callback Error " ..tostring(Response))
-					wait(0.5)
-					Button.Title.Text = ButtonSettings.Name
-					TweenService:Create(Button, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-					TweenService:Create(Button, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-					TweenService:Create(Button.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-				else
-					tween(Button.UIStroke, {Color = Color3.fromRGB(136, 131, 163)})
-					wait(0.2)
-					if ButtonV.Hover then
-						tween(Button.UIStroke, {Color = Color3.fromRGB(87, 84, 104)})
-					else
-						tween(Button.UIStroke, {Color = Color3.fromRGB(64,61,76)})
-					end
-				end
-			end)
-
-			Button["MouseEnter"]:Connect(function()
-				ButtonV.Hover = true
-				tween(Button.UIStroke, {Color = Color3.fromRGB(87, 84, 104)})
-			end)
-
-			Button["MouseLeave"]:Connect(function()
-				ButtonV.Hover = false
-				tween(Button.UIStroke, {Color = Color3.fromRGB(64,61,76)})
-			end)
-
-			function ButtonV:Set(ButtonSettings2)
-				ButtonSettings2 = Kwargify({
-					Name = ButtonSettings.Name,
-					Description = ButtonSettings.Description,
-					Callback = ButtonSettings.Callback
-				}, ButtonSettings2 or {})
-
-				ButtonSettings = ButtonSettings2
-				ButtonV.Settings = ButtonSettings2
-
-				Button.Name = ButtonSettings.Name
-				Button.Title.Text = ButtonSettings.Name
-				if ButtonSettings.Description ~= nil and ButtonSettings.Description ~= "" and Button.Desc ~= nil then
-					Button.Desc.Text = ButtonSettings.Description
-				end
-			end
-
-			function ButtonV:Destroy()
-				Button.Visible = false
-				Button:Destroy()
-			end
-
-			return ButtonV
-		end
-
-		-- Label
-		function Tab:CreateLabel(LabelSettings)
-
-			local LabelV = {}
-
-			LabelSettings = Kwargify({
-				Text = "Label",
-				Style = 1
-			}, LabelSettings or {}) 
-
-			LabelV.Settings = LabelSettings
-
-			local Label
-			if LabelSettings.Style == 1 then
-				Label = Elements.Template.Label:Clone()
-			elseif LabelSettings.Style == 2 then
-				Label = Elements.Template.Info:Clone()
-			elseif LabelSettings.Style == 3 then
-				Label = Elements.Template.Warn:Clone()
-			end
-
-			Label.Text.Text = LabelSettings.Text
-			Label.Visible = true
-			Label.Parent = TabPage
-
-			Label.BackgroundTransparency = 1
-			Label.UIStroke.Transparency = 1
-			Label.Text.TextTransparency = 1
-
-			if LabelSettings.Style ~= 1 then
-				TweenService:Create(Label, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.8}):Play()
-			else
-				TweenService:Create(Label, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-			end
-			TweenService:Create(Label.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-			TweenService:Create(Label.Text, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()	
-
-			function LabelV:Set(NewLabel)
-				LabelSettings.Text = NewLabel
-				LabelV.Settings = LabelSettings
-				Label.Text.Text = NewLabel
-			end
-
-			function LabelV:Destroy()
-				Label.Visible = false
-				Label:Destroy()
-			end
-
-			return LabelV
-		end
-
-		-- Paragraph
-		function Tab:CreateParagraph(ParagraphSettings)
-
-			ParagraphSettings = Kwargify({
-				Title = "Paragraph",
-				Text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus venenatis lacus sed tempus eleifend. Mauris interdum bibendum felis, in tempor augue egestas vel. Praesent tristique consectetur ex, eu pretium sem placerat non. Vestibulum a nisi sit amet augue facilisis consectetur sit amet et nunc. Integer fermentum ornare cursus. Pellentesque sed ultricies metus, ut egestas metus. Vivamus auctor erat ac sapien vulputate, nec ultricies sem tempor. Quisque leo lorem, faucibus nec pulvinar nec, congue eu velit. Duis sodales massa efficitur imperdiet ultrices. Donec eros ipsum, ornare pharetra purus aliquam, tincidunt elementum nisi. Ut mi tortor, feugiat eget nunc vitae, facilisis interdum dui. Vivamus ullamcorper nunc dui, a dapibus nisi pretium ac. Integer eleifend placerat nibh, maximus malesuada tellus. Cras in justo in ligula scelerisque suscipit vel vitae quam."
-			}, ParagraphSettings or {})
-
-			local ParagraphV = {
-				Settings = ParagraphSettings
-			}
-
-			local Paragraph = Elements.Template.Paragraph:Clone()
-			Paragraph.Title.Text = ParagraphSettings.Title
-			Paragraph.Text.Text = ParagraphSettings.Text
-			Paragraph.Visible = true
-			Paragraph.Parent = TabPage
-
-			Paragraph.BackgroundTransparency = 1
-			Paragraph.UIStroke.Transparency = 1
-			Paragraph.Title.TextTransparency = 1
-			Paragraph.Text.TextTransparency = 1
-
-			TweenService:Create(Paragraph, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-			TweenService:Create(Paragraph.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-			TweenService:Create(Paragraph.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()	
-			TweenService:Create(Paragraph.Text, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()	
-
-			function ParagraphV:Update()
-				Paragraph.Text.Size = UDim2.new(Paragraph.Text.Size.X.Scale, Paragraph.Text.Size.X.Offset, 0, math.huge)
-				Paragraph.Text.Size = UDim2.new(Paragraph.Text.Size.X.Scale, Paragraph.Text.Size.X.Offset, 0, Paragraph.Text.TextBounds.Y)
-				tween(Paragraph, {Size = UDim2.new(Paragraph.Size.X.Scale, Paragraph.Size.X.Offset, 0, Paragraph.Text.TextBounds.Y + 40)})
-			end
-
-			function ParagraphV:Set(NewParagraphSettings)
-
-				NewParagraphSettings = Kwargify({
-					Title = ParagraphSettings.Title,
-					Text = ParagraphSettings.Text
-				}, NewParagraphSettings or {})
-
-				ParagraphV.Settings = NewParagraphSettings
-
-				Paragraph.Title.Text = NewParagraphSettings.Title
-				Paragraph.Text.Text = NewParagraphSettings.Text
-
-				ParagraphV:Update()
-
-			end
-
-			function ParagraphV:Destroy()
-				Paragraph.Visible = false
-				Paragraph:Destroy()
-			end
-
-			ParagraphV:Update()
-
-			return ParagraphV
-		end
-
-		-- Slider
-		function Tab:CreateSlider(SliderSettings, Flag)
-			local SliderV = { IgnoreConfig = false, Class = "Slider", Settings = SliderSettings }
-
-			SliderSettings = Kwargify({
-				Name = "Slider",
-				Range = {0, 200},
-				Increment = 1,
-				CurrentValue = 100,
-				Callback = function(Value)
-
-				end,
-			}, SliderSettings or {})
-
-			local SLDragging = false
-			local Slider = Elements.Template.Slider:Clone()
-			Slider.Name = SliderSettings.Name .. " - Slider"
-			Slider.Title.Text = SliderSettings.Name
-			Slider.Visible = true
-			Slider.Parent = TabPage
-
-			Slider.BackgroundTransparency = 1
-			Slider.UIStroke.Transparency = 1
-			Slider.Title.TextTransparency = 1
-
-			TweenService:Create(Slider, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-			TweenService:Create(Slider.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-			TweenService:Create(Slider.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()	
-
-			Slider.Main.Progress.Size =	UDim2.new(0, Slider.Main.AbsoluteSize.X * ((SliderSettings.CurrentValue + SliderSettings.Range[1]) / (SliderSettings.Range[2] - SliderSettings.Range[1])) > 5 and Slider.Main.AbsoluteSize.X * (SliderSettings.CurrentValue / (SliderSettings.Range[2] - SliderSettings.Range[1])) or 5, 1, 0)
-
-			Slider.Value.Text = tostring(SliderSettings.CurrentValue)
-			SliderV.CurrentValue = Slider.Value.Text
-
-			SliderSettings.Callback(SliderSettings.CurrentValue)
-
-			Slider["MouseEnter"]:Connect(function()
-				tween(Slider.UIStroke, {Color = Color3.fromRGB(87, 84, 104)})
-			end)
-
-			Slider["MouseLeave"]:Connect(function()
-				tween(Slider.UIStroke, {Color = Color3.fromRGB(64,61,76)})
-			end)
-
-			Slider.Interact.InputBegan:Connect(function(Input)
-				if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then 
-					SLDragging = true 
-				end 
-			end)
-
-			Slider.Interact.InputEnded:Connect(function(Input) 
-				if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then 
-					SLDragging = false 
-				end 
-			end)
-
-			Slider.Interact.MouseButton1Down:Connect(function()
-				local Current = Slider.Main.Progress.AbsolutePosition.X + Slider.Main.Progress.AbsoluteSize.X
-				local Start = Current
-				local Location
-				local Loop; Loop = RunService.Stepped:Connect(function()
-					if SLDragging then
-						Location = UserInputService:GetMouseLocation().X
-						Current = Current + 0.025 * (Location - Start)
-
-						if Location < Slider.Main.AbsolutePosition.X then
-							Location = Slider.Main.AbsolutePosition.X
-						elseif Location > Slider.Main.AbsolutePosition.X + Slider.Main.AbsoluteSize.X then
-							Location = Slider.Main.AbsolutePosition.X + Slider.Main.AbsoluteSize.X
-						end
-
-						if Current < Slider.Main.AbsolutePosition.X + 5 then
-							Current = Slider.Main.AbsolutePosition.X + 5
-						elseif Current > Slider.Main.AbsolutePosition.X + Slider.Main.AbsoluteSize.X then
-							Current = Slider.Main.AbsolutePosition.X + Slider.Main.AbsoluteSize.X
-						end
-
-						if Current <= Location and (Location - Start) < 0 then
-							Start = Location
-						elseif Current >= Location and (Location - Start) > 0 then
-							Start = Location
-						end
-						Slider.Main.Progress.Size = UDim2.new(0, Location - Slider.Main.AbsolutePosition.X, 1, 0)
-						local NewValue = SliderSettings.Range[1] + (Location - Slider.Main.AbsolutePosition.X) / Slider.Main.AbsoluteSize.X * (SliderSettings.Range[2] - SliderSettings.Range[1])
-
-						NewValue = math.floor(NewValue / SliderSettings.Increment + 0.5) * (SliderSettings.Increment * 10000000) / 10000000
-
-						Slider.Value.Text = tostring(NewValue)
-
-						if SliderSettings.CurrentValue ~= NewValue then
-							local Success, Response = pcall(function()
-								SliderSettings.Callback(NewValue)
-							end)
-							if not Success then
-								TweenService:Create(Slider, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-								TweenService:Create(Slider, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-								TweenService:Create(Slider.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-								Slider.Title.Text = "Callback Error"
-								print("Aurexis Interface Library | "..SliderSettings.Name.." Callback Error " ..tostring(Response))
-								wait(0.5)
-								Slider.Title.Text = SliderSettings.Name
-								TweenService:Create(Slider, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-								TweenService:Create(Slider, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-								TweenService:Create(Slider.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-							end
-
-							SliderSettings.CurrentValue = NewValue
-							SliderV.CurrentValue = SliderSettings.CurrentValue
-							-- Aurexis.Flags[SliderSettings.Flag] = SliderSettings
-						end
-					else
-						TweenService:Create(Slider.Main.Progress, TweenInfo.new(0.1, Enum.EasingStyle.Back, Enum.EasingDirection.In, 0, false), {Size = UDim2.new(0, Location - Slider.Main.AbsolutePosition.X > 5 and Location - Slider.Main.AbsolutePosition.X or 5, 1, 0)}):Play()
-						Loop:Disconnect()
-					end
-				end)
-			end)
-
-			local function Set(NewVal, bleh)
-
-				NewVal = NewVal or SliderSettings.CurrentValue
-
-				TweenService:Create(Slider.Main.Progress, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.InOut), {Size = UDim2.new(0, Slider.Main.AbsoluteSize.X * ((NewVal + SliderSettings.Range[1]) / (SliderSettings.Range[2] - SliderSettings.Range[1])) > 5 and Slider.Main.AbsoluteSize.X * (NewVal / (SliderSettings.Range[2] - SliderSettings.Range[1])) or 5, 1, 0)}):Play()
-				if not bleh then Slider.Value.Text = tostring(NewVal) end
-				local Success, Response = pcall(function()
-					SliderSettings.Callback(NewVal)
-				end)
-				if not Success then
-					TweenService:Create(Slider, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-					TweenService:Create(Slider, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-					TweenService:Create(Slider.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-					Slider.Title.Text = "Callback Error"
-					print("Aurexis Interface Library | "..SliderSettings.Name.." Callback Error " ..tostring(Response))
-					wait(0.5)
-					Slider.Title.Text = SliderSettings.Name
-					TweenService:Create(Slider, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-					TweenService:Create(Slider, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(30, 33, 40)}):Play()
-					TweenService:Create(Slider.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-				end
-
-				SliderSettings.CurrentValue = NewVal
-				SliderV.CurrentValue = SliderSettings.CurrentValue
-				-- Aurexis.Flags[SliderSettings.Flag] = SliderSettings
-
-			end
-
-			function SliderV:UpdateValue(Value)
-				Set(tonumber(Value))
-			end 
-
-			Slider.Value:GetPropertyChangedSignal("Text"):Connect(function()
-				local text = Slider.Value.Text
-				if not tonumber(text) and text ~= "." then
-					Slider.Value.Text = text:match("[0-9.]*") or ""
-				end
-				if SliderSettings.Range[2] < (tonumber(Slider.Value.Text) or 0) then Slider.Value.Text = SliderSettings.Range[2] end
-				Slider.Value.Size = UDim2.fromOffset(Slider.Value.TextBounds.X, 23)
-				Set(tonumber(Slider.Value.Text), true)
-			end)
-
-			function SliderV:Set(NewSliderSettings)
-				NewSliderSettings = Kwargify({
-					Name = SliderSettings.Name,
-					Range = SliderSettings.Range,
-					Increment = SliderSettings.Increment,
-					CurrentValue = SliderSettings.CurrentValue,
-					Callback = SliderSettings.Callback
-				}, NewSliderSettings or {})
-
-				SliderSettings = NewSliderSettings
-				SliderV.Settings = NewSliderSettings
-
-				Slider.Name = SliderSettings.Name .. " - Slider"
-				Slider.Title.Text = SliderSettings.Name
-
-				Set()
-
-				-- Aurexis.Flags[SliderSettings.Flag] = SliderSettings
-			end
-
-			function SliderV:Destroy()
-				Slider.Visible = false
-				Slider:Destroy()
-			end
-
-			if Flag then
-				Aurexis.Options[Flag] = SliderV
-			end
-
-			AurexisUI.ThemeRemote:GetPropertyChangedSignal("Value"):Connect(function()
-				Slider.Main.color.Color = Aurexis.ThemeGradient
-				Slider.Main.UIStroke.color.Color = Aurexis.ThemeGradient
-			end)
-
-			return SliderV
-
-		end
-
-		-- Toggle
-		function Tab:CreateToggle(ToggleSettings, Flag)    
-			local ToggleV = { IgnoreConfig = false, Class = "Toggle" }
-
-			ToggleSettings = Kwargify({
-				Name = "Toggle",
-				Description = nil,
-				CurrentValue = false,
-				Callback = function(Value)
-				end,
-			}, ToggleSettings or {})
-
-
-			local Toggle
-
-			if ToggleSettings.Description ~= nil and ToggleSettings.Description ~= "" then
-				Toggle = Elements.Template.ToggleDesc:Clone()
-			else
-				Toggle = Elements.Template.Toggle:Clone()
-			end
-
-			Toggle.Visible = true
-			Toggle.Parent = TabPage
-
-			Toggle.Name = ToggleSettings.Name .. " - Toggle"
-			Toggle.Title.Text = ToggleSettings.Name
-			if ToggleSettings.Description ~= nil and ToggleSettings.Description ~= "" then
-				Toggle.Desc.Text = ToggleSettings.Description
-			end
-
-			Toggle.UIStroke.Transparency = 1
-			Toggle.Title.TextTransparency = 1
-			if ToggleSettings.Description ~= nil and ToggleSettings.Description ~= "" then
-				Toggle.Desc.TextTransparency = 1
-			end
-
-			TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-			if ToggleSettings.Description ~= nil and ToggleSettings.Description ~= "" then
-				TweenService:Create(Toggle.Desc, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-			end
-			TweenService:Create(Toggle.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-			TweenService:Create(Toggle.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()	
-
-			local function Set(bool)
-				if bool then
-					Toggle.toggle.color.Enabled = true
-					tween(Toggle.toggle, {BackgroundTransparency = 0})
-
-					Toggle.toggle.UIStroke.color.Enabled = true
-					tween(Toggle.toggle.UIStroke, {Color = Color3.new(255,255,255)})
-
-					tween(Toggle.toggle.val, {BackgroundColor3 = Color3.fromRGB(255,255,255), Position = UDim2.new(1,-23,0.5,0), BackgroundTransparency = 0.45})
-				else
-					Toggle.toggle.color.Enabled = false
-					Toggle.toggle.UIStroke.color.Enabled = false
-
-					Toggle.toggle.UIStroke.Color = Color3.fromRGB(97,97,97)
-
-					tween(Toggle.toggle, {BackgroundTransparency = 1})
-
-					tween(Toggle.toggle.val, {BackgroundColor3 = Color3.fromRGB(97,97,97), Position = UDim2.new(0,5,0.5,0), BackgroundTransparency = 0})
-				end
-
-				ToggleV.CurrentValue = bool
-			end
-
-			Toggle.Interact.MouseButton1Click:Connect(function()
-				ToggleSettings.CurrentValue = not ToggleSettings.CurrentValue
-				Set(ToggleSettings.CurrentValue)
-
-				local Success, Response = pcall(function()
-					ToggleSettings.Callback(ToggleSettings.CurrentValue)
-				end)
-				if not Success then
-					TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-					TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-					TweenService:Create(Toggle.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-					Toggle.Title.Text = "Callback Error"
-					print("Aurexis Interface Library | "..ToggleSettings.Name.." Callback Error " ..tostring(Response))
-					wait(0.5)
-					Toggle.Title.Text = ToggleSettings.Name
-					TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-					TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-					TweenService:Create(Toggle.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-				end
-			end)
-
-			Toggle["MouseEnter"]:Connect(function()
-				tween(Toggle.UIStroke, {Color = Color3.fromRGB(87, 84, 104)})
-			end)
-
-			Toggle["MouseLeave"]:Connect(function()
-				tween(Toggle.UIStroke, {Color = Color3.fromRGB(64,61,76)})
-			end)
-
-			if ToggleSettings.CurrentValue then
-				Set(ToggleSettings.CurrentValue)
-				local Success, Response = pcall(function()
-					ToggleSettings.Callback(ToggleSettings.CurrentValue)
-				end)
-				if not Success then
-					TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-					TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-					TweenService:Create(Toggle.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-					Toggle.Title.Text = "Callback Error"
-					print("Aurexis Interface Library | "..ToggleSettings.Name.." Callback Error " ..tostring(Response))
-					wait(0.5)
-					Toggle.Title.Text = ToggleSettings.Name
-					TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-					TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-					TweenService:Create(Toggle.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-				end
-			end
-
-			function ToggleV:UpdateState(State)
-				ToggleSettings.CurrentValue = State
-				Set(ToggleSettings.CurrentValue)
-			end
-
-			function ToggleV:Set(NewToggleSettings)
-
-				NewToggleSettings = Kwargify({
-					Name = ToggleSettings.Name,
-					Description = ToggleSettings.Description,
-					CurrentValue = ToggleSettings.CurrentValue,
-					Callback = ToggleSettings.Callback
-				}, NewToggleSettings or {})
-
-				ToggleV.Settings = NewToggleSettings
-				ToggleSettings = NewToggleSettings
-
-				Toggle.Name = ToggleSettings.Name .. " - Toggle"
-				Toggle.Title.Text = ToggleSettings.Name
-				if ToggleSettings.Description ~= nil and ToggleSettings.Description ~= "" and Toggle.Desc ~= nil then
-					Toggle.Desc.Text = ToggleSettings.Description
-				end
-
-				Set(ToggleSettings.CurrentValue)
-
-				ToggleV.CurrentValue = ToggleSettings.CurrentValue
-
-				local Success, Response = pcall(function()
-					ToggleSettings.Callback(ToggleSettings.CurrentValue)
-				end)
-				if not Success then
-					TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-					TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-					TweenService:Create(Toggle.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
-					Toggle.Title.Text = "Callback Error"
-					print("Aurexis Interface Library | "..ToggleSettings.Name.." Callback Error " ..tostring(Response))
-					wait(0.5)
-					Toggle.Title.Text = ToggleSettings.Name
-					TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-					TweenService:Create(Toggle, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-					TweenService:Create(Toggle.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-				end
-			end
-
-			function ToggleV:Destroy()
-				Toggle.Visible = false
-				Toggle:Destroy()
-			end
-
-			AurexisUI.ThemeRemote:GetPropertyChangedSignal("Value"):Connect(function()
-				Toggle.toggle.color.Color = Aurexis.ThemeGradient
-				Toggle.toggle.UIStroke.color.Color = Aurexis.ThemeGradient
-			end)
-
-			if Flag then
-				Aurexis.Options[Flag] = ToggleV
-			end
-
-			return ToggleV
-
-		end
-
-		-- Bind
-		function Tab:CreateBind(BindSettings, Flag)
-			local BindV = { Class = "Keybind", IgnoreConfig = false, Settings = BindSettings, Active = false }
-
-			BindSettings = Kwargify({
-				Name = "Bind",
-				Description = nil,
-				CurrentBind = "Q",
-				HoldToInteract = false, -- setting this makes the Bind in toggle mode
-				Callback = function(Bind)
-					-- The function that takes place when the Bind is pressed
-					-- The variable (Bind) is a boolean for whether the Bind is being held or not (HoldToInteract needs to be true) or whether the Bind is currently active
-				end,
-
-				OnChangedCallback = function(Bind)
-					-- The function that takes place when the binded key changes
-					-- The variable (Bind) is a Enum.KeyCode for the new Binded Key
-				end,
-			}, BindSettings or {})
-
-			local CheckingForKey = false
-
-			local Bind
-			if BindSettings.Description ~= nil and BindSettings.Description ~= "" then
-				Bind = Elements.Template.BindDesc:Clone()
-			else
-				Bind = Elements.Template.Bind:Clone()
-			end
-
-			Bind.Visible = true
-			Bind.Parent = TabPage
-
-			Bind.Name = BindSettings.Name
-			Bind.Title.Text = BindSettings.Name
-			if BindSettings.Description ~= nil and BindSettings.Description ~= "" then
-				Bind.Desc.Text = BindSettings.Description
-			end
-
-			Bind.Title.TextTransparency = 1
-			if BindSettings.Description ~= nil and BindSettings.Description ~= "" then
-				Bind.Desc.TextTransparency = 1
-			end
-			Bind.BindFrame.BackgroundTransparency = 1
-			Bind.BindFrame.UIStroke.Transparency = 1
-			Bind.BindFrame.BindBox.TextTransparency = 1
-
-			TweenService:Create(Bind, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-			TweenService:Create(Bind.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-			if BindSettings.Description ~= nil and BindSettings.Description ~= "" then
-				TweenService:Create(Bind.Desc, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-			end
-			TweenService:Create(Bind.BindFrame, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.9}):Play()
-			TweenService:Create(Bind.BindFrame.UIStroke, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {Transparency = 0.3}):Play()
-			TweenService:Create(Bind.BindFrame.BindBox, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-
-
-			Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
-			Bind.BindFrame.BindBox.Size = UDim2.new(0, Bind.BindFrame.BindBox.TextBounds.X + 20, 0, 42)
-
-			Bind.BindFrame.BindBox.Focused:Connect(function()
-				CheckingForKey = true
-				Bind.BindFrame.BindBox.Text = ""
-			end)
-
-			Bind.BindFrame.BindBox.FocusLost:Connect(function()
-				CheckingForKey = false
-				if Bind.BindFrame.BindBox.Text == (nil or "") then
-					Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
-				end
-			end)
-
-			Bind["MouseEnter"]:Connect(function()
-				tween(Bind.UIStroke, {Color = Color3.fromRGB(87, 84, 104)})
-			end)
-
-			Bind["MouseLeave"]:Connect(function()
-				tween(Bind.UIStroke, {Color = Color3.fromRGB(64,61,76)})
-			end)
-			UserInputService.InputBegan:Connect(function(input, processed)
-
-				if CheckingForKey then
-					if input.KeyCode ~= Enum.KeyCode.Unknown and input.KeyCode ~= Window.Bind then
-						local SplitMessage = string.split(tostring(input.KeyCode), ".")
-						local NewKeyNoEnum = SplitMessage[3]
-						Bind.BindFrame.BindBox.Text = tostring(NewKeyNoEnum)
-						BindSettings.CurrentBind = tostring(NewKeyNoEnum)
-						local Success, Response = pcall(function()
-							BindSettings.Callback(BindSettings.CurrentBind)
-						end)
-						if not Success then
-							TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-							TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-							TweenService:Create(Bind.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-							Bind.Title.Text = "Callback Error"
-							print("Aurexis Interface Library | "..BindSettings.Name.." Callback Error " ..tostring(Response))
-							wait(0.5)
-							Bind.Title.Text = BindSettings.Name
-							TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-							TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-							TweenService:Create(Bind.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-						end
-						Bind.BindFrame.BindBox:ReleaseFocus()
-					end
-				elseif BindSettings.CurrentBind ~= nil and (input.KeyCode == Enum.KeyCode[BindSettings.CurrentBind] and not processed) then -- Test
-					local Held = true
-					local Connection
-					Connection = input.Changed:Connect(function(prop)
-						if prop == "UserInputState" then
-							Connection:Disconnect()
-							Held = false
-						end
-					end)
-
-					if not BindSettings.HoldToInteract then
-						BindV.Active = not BindV.Active
-						local Success, Response = pcall(function()
-							BindSettings.Callback(BindV.Active)
-						end)
-						if not Success then
-							TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-							TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-							TweenService:Create(Bind.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-							Bind.Title.Text = "Callback Error"
-							print("Aurexis Interface Library | "..BindSettings.Name.." Callback Error " ..tostring(Response))
-							wait(0.5)
-							Bind.Title.Text = BindSettings.Name
-							TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-							TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-							TweenService:Create(Bind.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-						end
-					else
-						wait(0.1)
-						if Held then
-							local Loop; Loop = RunService.Stepped:Connect(function()
-								if not Held then
-									local Success, Response = pcall(function()
-										BindSettings.Callback(false)
-									end)
-									if not Success then
-										TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-										TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-										TweenService:Create(Bind.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-										Bind.Title.Text = "Callback Error"
-										print("Aurexis Interface Library | "..BindSettings.Name.." Callback Error " ..tostring(Response))
-										wait(0.5)
-										Bind.Title.Text = BindSettings.Name
-										TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-										TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-										TweenService:Create(Bind.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-									end 
-									Loop:Disconnect()
-								else
-									local Success, Response = pcall(function()
-										BindSettings.Callback(true)
-									end)
-									if not Success then
-										TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-										TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-										TweenService:Create(Bind.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-										Bind.Title.Text = "Callback Error"
-										print("Aurexis Interface Library | "..BindSettings.Name.." Callback Error " ..tostring(Response))
-										wait(0.5)
-										Bind.Title.Text = BindSettings.Name
-										TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-										TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-										TweenService:Create(Bind.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-									end
-								end
-							end)	
-						end
-					end
-				end
-			end)
-
-			Bind.BindFrame.BindBox:GetPropertyChangedSignal("Text"):Connect(function()
-				TweenService:Create(Bind.BindFrame, TweenInfo.new(0.55, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(0, Bind.BindFrame.BindBox.TextBounds.X + 20, 0, 30)}):Play()
-			end)
-
-			function BindV:Set(NewBindSettings)
-
-				NewBindSettings = Kwargify({
-					Name = BindSettings.Name,
-					Description = BindSettings.Description,
-					CurrentBind =  BindSettings.CurrentBind,
-					HoldToInteract = BindSettings.HoldToInteract,
-					Callback = BindSettings.Callback
-				}, NewBindSettings or {})
-
-				BindV.Settings = NewBindSettings
-				BindSettings = NewBindSettings
-
-				Bind.Name = BindSettings.Name
-				Bind.Title.Text = BindSettings.Name
-				if BindSettings.Description ~= nil and BindSettings.Description ~= "" and Bind.Desc ~= nil then
-					Bind.Desc.Text = BindSettings.Description
-				end
-
-				Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
-				Bind.BindFrame.Size = UDim2.new(0, Bind.BindFrame.BindBox.TextBounds.X + 20, 0, 42)
-
-
-				BindV.CurrentBind = BindSettings.CurrentBind
-			end
-
-			function BindV:Destroy()
-				Bind.Visible = false
-				Bind:Destroy()
-			end
-
-			if Flag then
-				Aurexis.Options[Flag] = BindV
-			end
-
-			-- Aurexis.Flags[BindSettings.Flag] = BindSettings
-
-			return BindV
-
-		end
-
-		function Tab:CreateKeybind(BindSettings)
-
-			BindSettings = Kwargify({
-				Name = "Bind",
-				Description = nil,
-				CurrentBind = "Q",
-				HoldToInteract = false, -- setting this makes the Bind in toggle mode
-				Callback = function(Bind)
-					-- The function that takes place when the Bind is pressed
-					-- The variable (Bind) is a boolean for whether the Bind is being held or not (HoldToInteract needs to be true) or whether the Bind is currently active
-				end
-			}, BindSettings or {})
-
-			local BindV = { Settings = BindSettings, Active = false }
-			local CheckingForKey = false
-
-			local Bind
-			if BindSettings.Description ~= nil and BindSettings.Description ~= "" then
-				Bind = Elements.Template.BindDesc:Clone()
-			else
-				Bind = Elements.Template.Bind:Clone()
-			end
-
-			Bind.Visible = true
-			Bind.Parent = TabPage
-
-			Bind.Name = BindSettings.Name
-			Bind.Title.Text = BindSettings.Name
-			if BindSettings.Description ~= nil and BindSettings.Description ~= "" then
-				Bind.Desc.Text = BindSettings.Description
-			end
-
-			Bind.Title.TextTransparency = 1
-			if BindSettings.Description ~= nil and BindSettings.Description ~= "" then
-				Bind.Desc.TextTransparency = 1
-			end
-			Bind.BindFrame.BackgroundTransparency = 1
-			Bind.BindFrame.UIStroke.Transparency = 1
-			Bind.BindFrame.BindBox.TextTransparency = 1
-
-			TweenService:Create(Bind, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-			TweenService:Create(Bind.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-			if BindSettings.Description ~= nil and BindSettings.Description ~= "" then
-				TweenService:Create(Bind.Desc, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-			end
-			TweenService:Create(Bind.BindFrame, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.9}):Play()
-			TweenService:Create(Bind.BindFrame.UIStroke, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {Transparency = 0.3}):Play()
-			TweenService:Create(Bind.BindFrame.BindBox, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-
-
-			Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
-			Bind.BindFrame.BindBox.Size = UDim2.new(0, Bind.BindFrame.BindBox.TextBounds.X + 16, 0, 42)
-
-			Bind.BindFrame.BindBox.Focused:Connect(function()
-				CheckingForKey = true
-				Bind.BindFrame.BindBox.Text = ""
-			end)
-
-			Bind.BindFrame.BindBox.FocusLost:Connect(function()
-				CheckingForKey = false
-				if Bind.BindFrame.BindBox.Text == (nil or "") then
-					Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
-				end
-			end)
-
-			Bind["MouseEnter"]:Connect(function()
-				tween(Bind.UIStroke, {Color = Color3.fromRGB(87, 84, 104)})
-			end)
-
-			Bind["MouseLeave"]:Connect(function()
-				tween(Bind.UIStroke, {Color = Color3.fromRGB(64,61,76)})
-			end)
-			UserInputService.InputBegan:Connect(function(input, processed)
-
-				if CheckingForKey then
-					if input.KeyCode ~= Enum.KeyCode.Unknown and input.KeyCode ~= Enum.KeyCode.K then
-						local SplitMessage = string.split(tostring(input.KeyCode), ".")
-						local NewKeyNoEnum = SplitMessage[3]
-						Bind.BindFrame.BindBox.Text = tostring(NewKeyNoEnum)
-						BindSettings.CurrentBind = tostring(NewKeyNoEnum)
-						Bind.BindFrame.BindBox:ReleaseFocus()
-					end
-				elseif BindSettings.CurrentBind ~= nil and (input.KeyCode == Enum.KeyCode[BindSettings.CurrentBind] and not processed) then -- Test
-					local Held = true
-					local Connection
-					Connection = input.Changed:Connect(function(prop)
-						if prop == "UserInputState" then
-							Connection:Disconnect()
-							Held = false
-						end
-					end)
-
-					if not BindSettings.HoldToInteract then
-						BindV.Active = not BindV.Active
-						local Success, Response = pcall(function()
-							BindSettings.Callback(BindV.Active)
-						end)
-						if not Success then
-							TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-							TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-							TweenService:Create(Bind.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-							Bind.Title.Text = "Callback Error"
-							print("Aurexis Interface Library | "..BindSettings.Name.." Callback Error " ..tostring(Response))
-							wait(0.5)
-							Bind.Title.Text = BindSettings.Name
-							TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-							TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-							TweenService:Create(Bind.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-						end
-					else
-						wait(0.1)
-						if Held then
-							local Loop; Loop = RunService.Stepped:Connect(function()
-								if not Held then
-									local Success, Response = pcall(function()
-										BindSettings.Callback(false)
-									end)
-									if not Success then
-										TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-										TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-										TweenService:Create(Bind.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-										Bind.Title.Text = "Callback Error"
-										print("Aurexis Interface Library | "..BindSettings.Name.." Callback Error " ..tostring(Response))
-										wait(0.5)
-										Bind.Title.Text = BindSettings.Name
-										TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-										TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-										TweenService:Create(Bind.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-									end 
-									Loop:Disconnect()
-								else
-									local Success, Response = pcall(function()
-										BindSettings.Callback(true)
-									end)
-									if not Success then
-										TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-										TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-										TweenService:Create(Bind.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-										Bind.Title.Text = "Callback Error"
-										print("Aurexis Interface Library | "..BindSettings.Name.." Callback Error " ..tostring(Response))
-										wait(0.5)
-										Bind.Title.Text = BindSettings.Name
-										TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-										TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-										TweenService:Create(Bind.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-									end
-								end
-							end)	
-						end
-					end
-				end
-			end)
-
-			Bind.BindFrame.BindBox:GetPropertyChangedSignal("Text"):Connect(function()
-				TweenService:Create(Bind.BindFrame, TweenInfo.new(0.55, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(0, Bind.BindFrame.BindBox.TextBounds.X + 16, 0, 30)}):Play()
-			end)
-
-			function BindV:Set(NewBindSettings)
-
-				NewBindSettings = Kwargify({
-					Name = BindSettings.Name,
-					Description = BindSettings.Description,
-					CurrentBind =  BindSettings.CurrentBind,
-					HoldToInteract = BindSettings.HoldToInteract,
-					Callback = BindSettings.Callback
-				}, NewBindSettings or {})
-
-				BindV.Settings = NewBindSettings
-				BindSettings = NewBindSettings
-
-				Bind.Name = BindSettings.Name
-				Bind.Title.Text = BindSettings.Name
-				if BindSettings.Description ~= nil and BindSettings.Description ~= "" and Bind.Desc ~= nil then
-					Bind.Desc.Text = BindSettings.Description
-				end
-
-				Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
-				Bind.BindFrame.BindBox.Size = UDim2.new(0, Bind.BindFrame.BindBox.TextBounds.X + 16, 0, 42)
-
-				-- Aurexis.Flags[BindSettings.Flag] = BindSettings
-
-			end
-
-			function BindV:Destroy()
-				Bind.Visible = false
-				Bind:Destroy()
-			end
-
-			-- Aurexis.Flags[BindSettings.Flag] = BindSettings
-
-			return BindV
-
-		end
-
-		-- Dynamic Input
-		function Tab:CreateInput(InputSettings, Flag)
-			local InputV = { IgnoreConfig = false, Class = "Input", Settings = InputSettings }
-
-			InputSettings = Kwargify({
-				Name = "Dynamic Input",
-				Description = nil,
-				CurrentValue = "",
-				PlaceholderText = "Input Placeholder",
-				RemoveTextAfterFocusLost = false,
-				Numeric = false,
-				Enter = false,
-				MaxCharacters = nil,
-				Callback = function(Text)
-
-				end, -- 52
-			}, InputSettings or {})
-
-			InputV.CurrentValue = InputSettings.CurrentValue
-
-			local descriptionbool
-			if InputSettings.Description ~= nil and InputSettings.Description ~= "" then
-				descriptionbool = true
-			end
-
-			local Input 
-			if descriptionbool then
-				Input = Elements.Template.InputDesc:Clone()
-			else
-				Input = Elements.Template.Input:Clone()
-			end
-
-			Input.Name = InputSettings.Name
-			Input.Title.Text = InputSettings.Name
-			if descriptionbool then Input.Desc.Text = InputSettings.Description end
-			Input.Visible = true
-			Input.Parent = TabPage
-
-			Input.BackgroundTransparency = 1
-			Input.UIStroke.Transparency = 1
-			Input.Title.TextTransparency = 1
-			if descriptionbool then Input.Desc.TextTransparency = 1 end
-			Input.InputFrame.BackgroundTransparency = 1
-			Input.InputFrame.UIStroke.Transparency = 1
-			Input.InputFrame.InputBox.TextTransparency = 1
-
-			TweenService:Create(Input, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-			TweenService:Create(Input.UIStroke, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-			TweenService:Create(Input.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()	
-			if descriptionbool then TweenService:Create(Input.Desc, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play() end
-			TweenService:Create(Input.InputFrame, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.9}):Play()
-			TweenService:Create(Input.InputFrame.UIStroke, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {Transparency = 0.3}):Play()
-			TweenService:Create(Input.InputFrame.InputBox, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-
-			Input.InputFrame.InputBox.PlaceholderText = InputSettings.PlaceholderText
-			Input.InputFrame.Size = UDim2.new(0, Input.InputFrame.InputBox.TextBounds.X + 52, 0, 30)
-
-			Input.InputFrame.InputBox.FocusLost:Connect(function(bleh)
-
-				if InputSettings.Enter then
-					if bleh then
-						local Success, Response = pcall(function()
-							InputSettings.Callback(Input.InputFrame.InputBox.Text)
-							InputV.CurrentValue = Input.InputFrame.InputBox.Text
-						end)
-						if not Success then
-							TweenService:Create(Input, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-							TweenService:Create(Input, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-							TweenService:Create(Input.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-							Input.Title.Text = "Callback Error"
-							print("Aurexis Interface Library | "..InputSettings.Name.." Callback Error " ..tostring(Response))
-							wait(0.5)
-							Input.Title.Text = InputSettings.Name
-							TweenService:Create(Input, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-							TweenService:Create(Input, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-							TweenService:Create(Input.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-						end
-					end
-				end
-
-				if InputSettings.RemoveTextAfterFocusLost then
-					Input.InputFrame.InputBox.Text = ""
-				end
-
-			end)
-
-			if InputSettings.Numeric then
-				Input.InputFrame.InputBox:GetPropertyChangedSignal("Text"):Connect(function()
-					local text = Input.InputFrame.InputBox.Text
-					if not tonumber(text) and text ~= "." then
-						Input.InputFrame.InputBox.Text = text:match("[0-9.]*") or ""
-					end
-				end)
-			end
-
-			Input.InputFrame.InputBox:GetPropertyChangedSignal("Text"):Connect(function()
-				if tonumber(InputSettings.MaxCharacters) then
-					if (#Input.InputFrame.InputBox.Text - 1) == InputSettings.MaxCharacters then
-						Input.InputFrame.InputBox.Text = Input.InputFrame.InputBox.Text:sub(1, InputSettings.MaxCharacters)
-					end
-				end
-				TweenService:Create(Input.InputFrame, TweenInfo.new(0.55, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(0, Input.InputFrame.InputBox.TextBounds.X + 52, 0, 30)}):Play()
-				if not InputSettings.Enter then
-					local Success, Response = pcall(function()
-						InputSettings.Callback(Input.InputFrame.InputBox.Text)
-					end)
-					if not Success then
-						TweenService:Create(Input, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-						TweenService:Create(Input, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-						TweenService:Create(Input.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-						Input.Title.Text = "Callback Error"
-						print("Aurexis Interface Library | "..InputSettings.Name.." Callback Error " ..tostring(Response))
-						wait(0.5)
-						Input.Title.Text = InputSettings.Name
-						TweenService:Create(Input, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-						TweenService:Create(Input, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-						TweenService:Create(Input.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-					end
-				end
-				InputV.CurrentValue = Input.InputFrame.InputBox.Text				
-			end)
-
-			Input["MouseEnter"]:Connect(function()
-				tween(Input.UIStroke, {Color = Color3.fromRGB(87, 84, 104)})
-			end)
-
-			Input["MouseLeave"]:Connect(function()
-				tween(Input.UIStroke, {Color = Color3.fromRGB(64,61,76)})
-			end)
-
-
-			function InputV:Set(NewInputSettings)
-
-				NewInputSettings = Kwargify(InputSettings, NewInputSettings or {})
-
-				InputV.Settings = NewInputSettings
-				InputSettings = NewInputSettings
-
-				Input.Name = InputSettings.Name
-				Input.Title.Text = InputSettings.Name
-				if InputSettings.Description ~= nil and InputSettings.Description ~= "" and Input.Desc ~= nil then
-					Input.Desc.Text = InputSettings.Description
-				end
-
-				Input.InputFrame.InputBox:CaptureFocus()
-				Input.InputFrame.InputBox.Text = tostring(InputSettings.CurrentValue)
-				Input.InputFrame.InputBox:ReleaseFocus()
-				Input.InputFrame.Size = UDim2.new(0, Input.InputFrame.InputBox.TextBounds.X + 52, 0, 42)
-
-				InputV.CurrentValue = InputSettings.CurrentValue
-			end
-
-			function InputV:Destroy()
-				Input.Visible = false
-				Input:Destroy()
-			end
-
-			if Flag then
-				Aurexis.Options[Flag] = InputV
-			end
-
-
-			return InputV
-
-		end
-
-		-- Dropdown
-		function Tab:CreateDropdown(DropdownSettings, Flag)
-			local DropdownV = { IgnoreConfig = false, Class = "Dropdown", Settings = DropdownSettings}
-
-			DropdownSettings = Kwargify({
-				Name = "Dropdown",
-				Description = nil,
-				Options = {"Option 1", "Option 2"},
-				CurrentOption = {"Option 1"},
-				MultipleOptions = false,
-				SpecialType = nil, -- currently onl player, might add more soon
-				Callback = function(Options)
-					-- The function that takes place when the selected option is changed
-					-- The variable (Options) is a table of strings for the current selected options or a string if multioptions is false
-				end,
-			}, DropdownSettings or {})
-
-			DropdownV.CurrentOption = DropdownSettings.CurrentOption
-
-			local descriptionbool = false
-			if DropdownSettings.Description ~= nil and DropdownSettings.Description ~= "" then
-				descriptionbool = true
-			end
-			local closedsize
-			local openedsize
-			if descriptionbool then
-				closedsize = 48
-				openedsize = 170
-			elseif not descriptionbool then
-				closedsize = 38
-				openedsize = 160
-			end
-			local opened = false
-
-			local Dropdown
-			if descriptionbool then Dropdown = Elements.Template.DropdownDesc:Clone() else Dropdown = Elements.Template.Dropdown:Clone() end
-
-			Dropdown.Name = DropdownSettings.Name
-			Dropdown.Title.Text = DropdownSettings.Name
-			if descriptionbool then Dropdown.Desc.Text = DropdownSettings.Description end
-
-			Dropdown.Parent = TabPage
-			Dropdown.Visible = true
-
-			local function Toggle()
-				opened = not opened
-				if opened then
-					tween(Dropdown.icon, {Rotation = 180})
-					tween(Dropdown, {Size = UDim2.new(1, -25, 0, openedsize)})
-				else
-					tween(Dropdown.icon, {Rotation = 0})
-					tween(Dropdown, {Size = UDim2.new(1, -25, 0, closedsize)})
-				end
-			end
-
-			local function SafeCallback(param, c2)
-				local Success, Response = pcall(function()
-					DropdownSettings.Callback(param)
-				end)
-				if not Success then
-					TweenService:Create(Dropdown, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-					TweenService:Create(Dropdown, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-					TweenService:Create(Dropdown.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-					Dropdown.Title.Text = "Callback Error"
-					print("Aurexis Interface Library | "..DropdownSettings.Name.." Callback Error " ..tostring(Response))
-					wait(0.5)
-					Dropdown.Title.Text = DropdownSettings.Name
-					TweenService:Create(Dropdown, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-					TweenService:Create(Dropdown, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-					TweenService:Create(Dropdown.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-				end
-				if Success and c2 then
-					c2()
-				end
-			end
-
-			-- fixed by justhey
-			Dropdown.Selected:GetPropertyChangedSignal("Text"):Connect(function()
-				local text = Dropdown.Selected.Text:lower()
-				for _, Item in ipairs(Dropdown.List:GetChildren()) do
-					if Item:IsA("TextLabel") and Item.Name ~= "Template" then
-						Item.Visible = text == "" or string.find(Item.Name:lower(), text, 1, true) ~= nil
-					end
-				end
-			end)
-
-
-			local function Clear()
-				for _, option in ipairs(Dropdown.List:GetChildren()) do
-					if option.ClassName == "TextLabel" and option.Name ~= "Template" then
-						option:Destroy()
-					end
-				end
-			end
-
-			local function ActivateColorSingle(name)
-				for _, Option in pairs(Dropdown.List:GetChildren()) do
-					if Option.ClassName == "TextLabel" and Option.Name ~= "Template" then
-						tween(Option, {BackgroundTransparency = 0.98})
-					end
-				end
-
-				Toggle()
-				tween(Dropdown.List[name], {BackgroundTransparency = 0.95, TextColor3 = Color3.fromRGB(240,240,240)})
-			end
-
-			local function Refresh()
-				Clear()
-				for i,v in pairs(DropdownSettings.Options) do
-					local Option = Dropdown.List.Template:Clone()
-					local optionhover = false
-					Option.Text = v
-					if v == "Template" then v = "Template (Name)" end
-					Option.Name = v
-					Option.Interact.MouseButton1Click:Connect(function()
-						local bleh
-						if DropdownSettings.MultipleOptions then
-							if table.find(DropdownSettings.CurrentOption, v) then
-								RemoveTable(DropdownSettings.CurrentOption, v)
-								DropdownV.CurrentOption = DropdownSettings.CurrentOption
-								if not optionhover then
-									tween(Option, {TextColor3 = Color3.fromRGB(200,200,200)})
-								end
-								tween(Option, {BackgroundTransparency = 0.98})
-							else
-								table.insert(DropdownSettings.CurrentOption, v)
-								DropdownV.CurrentOption = DropdownSettings.CurrentOption
-								tween(Option, {TextColor3 = Color3.fromRGB(240,240,240), BackgroundTransparency = 0.95})
-							end
-							bleh = DropdownSettings.CurrentOption
-						else
-							DropdownSettings.CurrentOption = {v}
-							bleh = v
-							DropdownV.CurrentOption = bleh
-							ActivateColorSingle(v)
-						end
-
-						SafeCallback(bleh, function()
-							if DropdownSettings.MultipleOptions then
-								if DropdownSettings.CurrentOption and type(DropdownSettings.CurrentOption) == "table" then
-									if #DropdownSettings.CurrentOption == 1 then
-										Dropdown.Selected.PlaceholderText = DropdownSettings.CurrentOption[1]
-									elseif #DropdownSettings.CurrentOption == 0 then
-										Dropdown.Selected.PlaceholderText = "None"
-									else
-										Dropdown.Selected.PlaceholderText = unpackt(DropdownSettings.CurrentOption)
-									end
-								else
-									DropdownSettings.CurrentOption = {}
-									Dropdown.Selected.PlaceholderText = "None"
-								end
-							end
-							if not DropdownSettings.MultipleOptions then
-								Dropdown.Selected.PlaceholderText = DropdownSettings.CurrentOption[1] or "None"
-							end
-							Dropdown.Selected.Text = ""
-						end)
-					end)
-					Option.Visible = true
-					Option.Parent = Dropdown.List
-					Option.MouseEnter:Connect(function()
-						optionhover = true
-						if Option.BackgroundTransparency == 0.95 then
-							return
-						else
-							tween(Option, {TextColor3 = Color3.fromRGB(240,240,240)})
-						end
-					end)
-					Option.MouseLeave:Connect(function()
-						optionhover = false
-						if Option.BackgroundTransparency == 0.95 then
-							return
-						else
-							tween(Option, {TextColor3 = Color3.fromRGB(200,200,200)})
-						end
-					end)	
-				end
-			end
-
-			local function PlayerTableRefresh()
-				for i,v in pairs(DropdownSettings.Options) do
-					table.remove(DropdownSettings.Options, i)
-				end
-
-				for i,v in pairs(Players:GetChildren()) do
-					table.insert(DropdownSettings.Options, v.Name)
-				end
-			end
-
-			Dropdown.Interact.MouseButton1Click:Connect(function()
-				Toggle()
-			end)
-
-			Dropdown["MouseEnter"]:Connect(function()
-				tween(Dropdown.UIStroke, {Color = Color3.fromRGB(87, 84, 104)})
-			end)
-
-			Dropdown["MouseLeave"]:Connect(function()
-				tween(Dropdown.UIStroke, {Color = Color3.fromRGB(64,61,76)})
-			end)
-
-			if DropdownSettings.SpecialType == "Player" then
-
-				for i,v in pairs(DropdownSettings.Options) do
-					table.remove(DropdownSettings.Options, i)
-				end
-				PlayerTableRefresh()
-				DropdownSettings.CurrentOption = DropdownSettings.Options[1]
-
-				Players.PlayerAdded:Connect(function() PlayerTableRefresh() end)
-				Players.PlayerRemoving:Connect(function() PlayerTableRefresh() end)
-
-			end
-
-			Refresh()
-
-			if DropdownSettings.CurrentOption then
-				if type(DropdownSettings.CurrentOption) == "string" then
-					DropdownSettings.CurrentOption = {DropdownSettings.CurrentOption}
-				end
-				if not DropdownSettings.MultipleOptions and type(DropdownSettings.CurrentOption) == "table" then
-					DropdownSettings.CurrentOption = {DropdownSettings.CurrentOption[1]}
-				end
-			else
-				DropdownSettings.CurrentOption = {}
-			end
-
-			local bleh, ind = nil,0
-			for i,v in pairs(DropdownSettings.CurrentOption) do
-				ind = ind + 1
-			end
-			if ind == 1 then bleh = DropdownSettings.CurrentOption[1] else bleh = DropdownSettings.CurrentOption end
-			SafeCallback(bleh)
-			if type(bleh) == "string" then 
-				tween(Dropdown.List[bleh], {TextColor3 = Color3.fromRGB(240,240,240), BackgroundTransparency = 0.95})
-			else
-				for i,v in pairs(bleh) do
-					tween(Dropdown.List[v], {TextColor3 = Color3.fromRGB(240,240,240), BackgroundTransparency = 0.95})
-				end
-			end
-
-			if DropdownSettings.MultipleOptions then
-				if DropdownSettings.CurrentOption and type(DropdownSettings.CurrentOption) == "table" then
-					if #DropdownSettings.CurrentOption == 1 then
-						Dropdown.Selected.PlaceholderText = DropdownSettings.CurrentOption[1]
-					elseif #DropdownSettings.CurrentOption == 0 then
-						Dropdown.Selected.PlaceholderText = "None"
-					else
-						Dropdown.Selected.PlaceholderText = unpackt(DropdownSettings.CurrentOption)
-					end
-				else
-					DropdownSettings.CurrentOption = {}
-					Dropdown.Selected.PlaceholderText = "None"
-				end
-				for _, name in pairs(DropdownSettings.CurrentOption) do
-					tween(Dropdown.List[name], {TextColor3 = Color3.fromRGB(227,227,227), BackgroundTransparency = 0.95})
-				end
-			else
-				Dropdown.Selected.PlaceholderText = DropdownSettings.CurrentOption[1] or "None"
-			end
-			Dropdown.Selected.Text = ""
-
-			function DropdownV:Set(NewDropdownSettings)
-				NewDropdownSettings = Kwargify(DropdownSettings, NewDropdownSettings or {})
-
-				DropdownV.Settings = NewDropdownSettings
-				DropdownSettings = NewDropdownSettings
-
-				Dropdown.Name = DropdownSettings.Name
-				Dropdown.Title.Text = DropdownSettings.Name
-				if DropdownSettings.Description ~= nil and DropdownSettings.Description ~= "" and Dropdown.Desc ~= nil then
-					Dropdown.Desc.Text = DropdownSettings.Description
-				end
-
-				if DropdownSettings.SpecialType == "Player" then
-
-					for i,v in pairs(DropdownSettings.Options) do
-						table.remove(DropdownSettings.Options, i)
-					end
-					PlayerTableRefresh()
-					DropdownSettings.CurrentOption = DropdownSettings.Options[1]                    
-					Players.PlayerAdded:Connect(function() PlayerTableRefresh() end)
-					Players.PlayerRemoving:Connect(function() PlayerTableRefresh() end)
-
-				end
-
-				Refresh()
-
-				if DropdownSettings.CurrentOption then
-					if type(DropdownSettings.CurrentOption) == "string" then
-						DropdownSettings.CurrentOption = {DropdownSettings.CurrentOption}
-					end
-					if not DropdownSettings.MultipleOptions and type(DropdownSettings.CurrentOption) == "table" then
-						DropdownSettings.CurrentOption = {DropdownSettings.CurrentOption[1]}
-					end
-				else
-					DropdownSettings.CurrentOption = {}
-				end
-
-				local bleh, ind = nil,0
-				for i,v in pairs(DropdownSettings.CurrentOption) do
-					ind = ind + 1
-				end
-				if ind == 1 then bleh = DropdownSettings.CurrentOption[1] else bleh = DropdownSettings.CurrentOption end
-				SafeCallback(bleh)
-				for _, Option in pairs(Dropdown.List:GetChildren()) do
-					if Option.ClassName == "TextLabel" then
-						tween(Option, {TextColor3 = Color3.fromRGB(200,200,200), BackgroundTransparency = 0.98})
-					end
-				end
-				tween(Dropdown.List[bleh], {TextColor3 = Color3.fromRGB(240,240,240), BackgroundTransparency = 0.95})
-
-				if DropdownSettings.MultipleOptions then
-					if DropdownSettings.CurrentOption and type(DropdownSettings.CurrentOption) == "table" then
-						if #DropdownSettings.CurrentOption == 1 then
-							Dropdown.Selected.PlaceholderText = DropdownSettings.CurrentOption[1]
-						elseif #DropdownSettings.CurrentOption == 0 then
-							Dropdown.Selected.PlaceholderText = "None"
-						else
-							Dropdown.Selected.PlaceholderText = unpackt(DropdownSettings.CurrentOption)
-						end
-					else
-						DropdownSettings.CurrentOption = {}
-						Dropdown.Selected.PlaceholderText = "None"
-					end
-					for _, name in pairs(DropdownSettings.CurrentOption) do
-						tween(Dropdown.List[name], {TextColor3 = Color3.fromRGB(227,227,227), BackgroundTransparency = 0.95})
-					end
-				else
-					Dropdown.Selected.PlaceholderText = DropdownSettings.CurrentOption[1] or "None"
-				end
-				Dropdown.Selected.Text = ""
-
-				-- Aurexis.Flags[DropdownSettings.Flag] = DropdownSettings
-
-			end
-
-			function DropdownV:Destroy()
-				Dropdown.Visible = false
-				Dropdown:Destroy()
-			end
-
-			if Flag then
-				Aurexis.Options[Flag] = DropdownV
-			end
-
-			-- Aurexis.Flags[DropdownSettings.Flag] = DropdownSettings
-
-			return DropdownV
-
-		end
-
-		-- Color Picker
-		function Tab:CreateColorPicker(ColorPickerSettings, Flag) -- by Rayfield/Throit
-			local ColorPickerV = {IgnoreClass = false, Class = "Colorpicker", Settings = ColorPickerSettings}
-
-			ColorPickerSettings = Kwargify({
-				Name = "Color Picker",
-				Color = Color3.fromRGB(255,255,255),
-				Callback = function(Value)
-					-- The function that takes place every time the color picker is moved/changed
-					-- The variable (Value) is a Color3fromRGB value based on which color is selected
-				end
-			}, ColorPickerSettings or {})
-
-			local function Color3ToHex(color)
-				return string.format("#%02X%02X%02X", math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255))
-			end
-
-			ColorPickerV.Color = Color3ToHex(ColorPickerSettings.Color)
-
-			local closedsize = UDim2.new(0, 75, 0, 22)
-			local openedsize = UDim2.new(0, 219, 0, 129)
-
-			local ColorPicker = Elements.Template.ColorPicker:Clone()
-			local Background = ColorPicker.CPBackground
-			local Display = Background.Display
-			local Main = Background.MainCP
-			local Slider = ColorPicker.ColorSlider
-
-			ColorPicker.Name = ColorPickerSettings.Name
-			ColorPicker.Title.Text = ColorPickerSettings.Name
-			ColorPicker.Visible = true
-			ColorPicker.Parent = TabPage
-			ColorPicker.Size = UDim2.new(1.042, -25,0, 38)
-			Background.Size = closedsize
-			Display.BackgroundTransparency = 0
-
-			ColorPicker["MouseEnter"]:Connect(function()
-				tween(ColorPicker.UIStroke, {Color = Color3.fromRGB(87, 84, 104)})
-			end)
-			ColorPicker["MouseLeave"]:Connect(function()
-				tween(ColorPicker.UIStroke, {Color = Color3.fromRGB(64,61,76)})
-			end)
-
-			local function SafeCallback(param, c2)
-				local Success, Response = pcall(function()
-					ColorPickerSettings.Callback(param)
-				end)
-				if not Success then
-					TweenService:Create(ColorPicker, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-					TweenService:Create(ColorPicker, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-					TweenService:Create(ColorPicker.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-					ColorPicker.Title.Text = "Callback Error"
-					print("Aurexis Interface Library | "..ColorPickerSettings.Name.." Callback Error " ..tostring(Response))
-					wait(0.5)
-					ColorPicker.Title.Text = ColorPickerSettings.Name
-					TweenService:Create(ColorPicker, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-					TweenService:Create(ColorPicker, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-					TweenService:Create(ColorPicker.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-				end
-				if Success and c2 then
-					c2()
-				end
-			end
-
-			local opened = false
-
-			local mouse = game.Players.LocalPlayer:GetMouse()
-			Main.Image = "http://www.roblox.com/asset/?id=11415645739"
-			local mainDragging = false 
-			local sliderDragging = false 
-			ColorPicker.Interact.MouseButton1Down:Connect(function()
-				if not opened then
-					opened = true 
-					tween(ColorPicker, {Size = UDim2.new( 1.042, -25,0, 165)}, nil, TweenInfo.new(0.6, Enum.EasingStyle.Exponential))
-					tween(Background, {Size = openedsize})
-					tween(Display, {BackgroundTransparency = 1})
-				else
-					opened = false
-					tween(ColorPicker, {Size = UDim2.new(1.042, -25,0, 38)}, nil, TweenInfo.new(0.6, Enum.EasingStyle.Exponential))
-					tween(Background, {Size = closedsize})
-					tween(Display, {BackgroundTransparency = 0})
-				end
-			end)
-			UserInputService.InputEnded:Connect(function(input, gameProcessed) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
-					mainDragging = false
-					sliderDragging = false
-				end end)
-			Main.MouseButton1Down:Connect(function()
-				if opened then
-					mainDragging = true 
-				end
-			end)
-			Main.MainPoint.MouseButton1Down:Connect(function()
-				if opened then
-					mainDragging = true 
-				end
-			end)
-			Slider.MouseButton1Down:Connect(function()
-				sliderDragging = true 
-			end)
-			Slider.SliderPoint.MouseButton1Down:Connect(function()
-				sliderDragging = true 
-			end)
-			local h,s,v = ColorPickerSettings.Color:ToHSV()
-			local color = Color3.fromHSV(h,s,v) 
-			local r,g,b = math.floor((h*255)+0.5),math.floor((s*255)+0.5),math.floor((v*255)+0.5)
-			local hex = string.format("#%02X%02X%02X",color.R*0xFF,color.G*0xFF,color.B*0xFF)
-			ColorPicker.HexInput.InputBox.Text = hex
-			local function setDisplay(hp,sp,vp)
-				--Main
-				Main.MainPoint.Position = UDim2.new(s,-Main.MainPoint.AbsoluteSize.X/2,1-v,-Main.MainPoint.AbsoluteSize.Y/2)
-				Main.MainPoint.ImageColor3 = Color3.fromHSV(hp,sp,vp)
-				Background.BackgroundColor3 = Color3.fromHSV(hp,1,1)
-				Display.BackgroundColor3 = Color3.fromHSV(hp,sp,vp)
-				--Slider 
-				local x = hp * Slider.AbsoluteSize.X
-				Slider.SliderPoint.Position = UDim2.new(0,x-Slider.SliderPoint.AbsoluteSize.X/2,0.5,0)
-				Slider.SliderPoint.ImageColor3 = Color3.fromHSV(hp,1,1)
-				local color = Color3.fromHSV(hp,sp,vp) 
-				local r,g,b = math.floor((color.R*255)+0.5),math.floor((color.G*255)+0.5),math.floor((color.B*255)+0.5)
-				ColorPicker.RInput.InputBox.Text = tostring(r)
-				ColorPicker.GInput.InputBox.Text = tostring(g)
-				ColorPicker.BInput.InputBox.Text = tostring(b)
-				hex = string.format("#%02X%02X%02X",color.R*0xFF,color.G*0xFF,color.B*0xFF)
-				ColorPicker.HexInput.InputBox.Text = hex
-			end
-			setDisplay(h,s,v)
-			ColorPicker.HexInput.InputBox.FocusLost:Connect(function()
-				if not pcall(function()
-						local r, g, b = string.match(ColorPicker.HexInput.InputBox.Text, "^#?(%w%w)(%w%w)(%w%w)$")
-						local rgbColor = Color3.fromRGB(tonumber(r, 16),tonumber(g, 16), tonumber(b, 16))
-						h,s,v = rgbColor:ToHSV()
-						hex = ColorPicker.HexInput.InputBox.Text
-						setDisplay()
-						ColorPickerSettings.Color = rgbColor
-					end) 
-				then 
-					ColorPicker.HexInput.InputBox.Text = hex 
-				end
-				local r,g,b = math.floor((h*255)+0.5),math.floor((s*255)+0.5),math.floor((v*255)+0.5)
-				ColorPickerSettings.Color = Color3.fromRGB(r,g,b)
-				SafeCallback( Color3.fromRGB(r,g,b))
-			end)
-			--RGB
-			local function rgbBoxes(box,toChange)
-				local value = tonumber(box.Text) 
-				local color = Color3.fromHSV(h,s,v) 
-				local oldR,oldG,oldB = math.floor((color.R*255)+0.5),math.floor((color.G*255)+0.5),math.floor((color.B*255)+0.5)
-				local save 
-				if toChange == "R" then save = oldR;oldR = value elseif toChange == "G" then save = oldG;oldG = value else save = oldB;oldB = value end
-				if value then 
-					value = math.clamp(value,0,255)
-					h,s,v = Color3.fromRGB(oldR,oldG,oldB):ToHSV()
-					setDisplay()
-				else 
-					box.Text = tostring(save)
-				end
-				local r,g,b = math.floor((color.R*255)+0.5),math.floor((color.G*255)+0.5),math.floor((color.B*255)+0.5)
-				ColorPickerSettings.Color = Color3.fromRGB(r,g,b)
-			end
-			ColorPicker.RInput.InputBox.FocusLost:connect(function()
-				rgbBoxes(ColorPicker.RInput.InputBox,"R")
-				SafeCallback(Color3.fromRGB(r,g,b))
-			end)
-			ColorPicker.GInput.InputBox.FocusLost:connect(function()
-				rgbBoxes(ColorPicker.GInput.InputBox,"G")
-				SafeCallback(Color3.fromRGB(r,g,b))
-			end)
-			ColorPicker.BInput.InputBox.FocusLost:connect(function()
-				rgbBoxes(ColorPicker.BInput.InputBox,"B")
-				SafeCallback(Color3.fromRGB(r,g,b))
-			end)
-			RunService.RenderStepped:connect(function()
-				if mainDragging then 
-					local localX = math.clamp(mouse.X-Main.AbsolutePosition.X,0,Main.AbsoluteSize.X)
-					local localY = math.clamp(mouse.Y-Main.AbsolutePosition.Y,0,Main.AbsoluteSize.Y)
-					Main.MainPoint.Position = UDim2.new(0,localX-Main.MainPoint.AbsoluteSize.X/2,0,localY-Main.MainPoint.AbsoluteSize.Y/2)
-					s = localX / Main.AbsoluteSize.X
-					v = 1 - (localY / Main.AbsoluteSize.Y)
-					Display.BackgroundColor3 = Color3.fromHSV(h,s,v)
-					Main.MainPoint.ImageColor3 = Color3.fromHSV(h,s,v)
-					Background.BackgroundColor3 = Color3.fromHSV(h,1,1)
-					local color = Color3.fromHSV(h,s,v) 
-					local r,g,b = math.floor((color.R*255)+0.5),math.floor((color.G*255)+0.5),math.floor((color.B*255)+0.5)
-					ColorPicker.RInput.InputBox.Text = tostring(r)
-					ColorPicker.GInput.InputBox.Text = tostring(g)
-					ColorPicker.BInput.InputBox.Text = tostring(b)
-					ColorPicker.HexInput.InputBox.Text = string.format("#%02X%02X%02X",color.R*0xFF,color.G*0xFF,color.B*0xFF)
-					SafeCallback(Color3.fromRGB(r,g,b))
-					ColorPickerSettings.Color = Color3.fromRGB(r,g,b)
-					ColorPickerV.Color = ColorPickerSettings.Color
-				end
-				if sliderDragging then 
-					local localX = math.clamp(mouse.X-Slider.AbsolutePosition.X,0,Slider.AbsoluteSize.X)
-					h = localX / Slider.AbsoluteSize.X
-					Display.BackgroundColor3 = Color3.fromHSV(h,s,v)
-					Slider.SliderPoint.Position = UDim2.new(0,localX-Slider.SliderPoint.AbsoluteSize.X/2,0.5,0)
-					Slider.SliderPoint.ImageColor3 = Color3.fromHSV(h,1,1)
-					Background.BackgroundColor3 = Color3.fromHSV(h,1,1)
-					Main.MainPoint.ImageColor3 = Color3.fromHSV(h,s,v)
-					local color = Color3.fromHSV(h,s,v) 
-					local r,g,b = math.floor((color.R*255)+0.5),math.floor((color.G*255)+0.5),math.floor((color.B*255)+0.5)
-					ColorPicker.RInput.InputBox.Text = tostring(r)
-					ColorPicker.GInput.InputBox.Text = tostring(g)
-					ColorPicker.BInput.InputBox.Text = tostring(b)
-					ColorPicker.HexInput.InputBox.Text = string.format("#%02X%02X%02X",color.R*0xFF,color.G*0xFF,color.B*0xFF)
-					SafeCallback(Color3.fromRGB(r,g,b))
-					ColorPickerSettings.Color = Color3.fromRGB(r,g,b)
-					ColorPickerV.Color = ColorPickerSettings.Color
-				end
-			end)
-
-			function ColorPickerV:Set(NewColorPickerSettings)
-
-				NewColorPickerSettings = Kwargify(ColorPickerSettings, NewColorPickerSettings or {})
-
-				ColorPickerV.Settings = NewColorPickerSettings
-				ColorPickerSettings = NewColorPickerSettings
-
-				ColorPicker.Name = ColorPickerSettings.Name
-				ColorPicker.Title.Text = ColorPickerSettings.Name
-				ColorPicker.Visible = true
-
-				local h,s,v = ColorPickerSettings.Color:ToHSV()
-				local color = Color3.fromHSV(h,s,v) 
-				local r,g,b = math.floor((color.R*255)+0.5),math.floor((color.G*255)+0.5),math.floor((color.B*255)+0.5)
-				local hex = string.format("#%02X%02X%02X",color.R*0xFF,color.G*0xFF,color.B*0xFF)
-				ColorPicker.HexInput.InputBox.Text = hex
-				setDisplay(h,s,v)
-				SafeCallback(Color3.fromRGB(r,g,b))
-
-				ColorPickerV.Color = ColorPickerSettings.Color
-			end
-
-			function ColorPickerV:Destroy()
-				ColorPicker:Destroy()
-			end
-
-			if Flag then
-				Aurexis.Options[Flag] = ColorPickerV
-			end
-
-			SafeCallback(ColorPickerSettings.Color)
-
-			return ColorPickerV
-		end
-
-
-		function Tab:BuildConfigSection()
-			if isStudio then
-				Tab:CreateLabel({Text = "Config system unavailable. (Environment isStudio)", Style = 3})
-				return "Config system unavailable." 
-			end
-
-			local inputPath = nil
-			local selectedConfig = nil
-
-			local Title = Elements.Template.Title:Clone()
-			Title.Text = "Configurations"
-			Title.Visible = true
-			Title.Parent = TabPage
-			Title.TextTransparency = 1
-			TweenService:Create(Title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
-
-			Tab:CreateSection("Config Creator")
-
-			Tab:CreateInput({
-				Name = "Config Name",
-				Description = "Insert a name for your to be created config.",
-				PlaceholderText = "Name",
-				CurrentValue = "",
-				Numeric = false,
-				MaxCharacters = nil,
-				Enter = false,
-				Callback = function(input)
-					inputPath = input
-				end,
-			})
-
-			local configSelection
-
-			Tab:CreateButton({
-				Name = "Create Config",
-				Description = "Create a config with all of your current settings.",
-				Callback = function()
-					if not inputPath or string.gsub(inputPath, " ", "") == "" then
-						Aurexis:Notification({
-							Title = "Interface",
-							Icon = "warning",
-							ImageSource = "Material",
-							Content = "Config name cannot be empty."
-						})
-						return
-					end
-
-					local success, returned = Aurexis:SaveConfig(inputPath)
-					if not success then
-						Aurexis:Notification({
-							Title = "Interface",
-							Icon = "error",
-							ImageSource = "Material",
-							Content = "Unable to save config, return error: " .. returned
-						})
-					end
-
-					Aurexis:Notification({
-						Title = "Interface",
-						Icon = "info",
-						ImageSource = "Material",
-						Content = string.format("Created config %q", inputPath),
-					})
-
-					configSelection:Set({ Options = Aurexis:RefreshConfigList() })
-				end
-			})
-
-			Tab:CreateSection("Config Load/Settings")
-
-
-			configSelection = Tab:CreateDropdown({
-				Name = "Select Config",
-				Description = "Select a config to load your settings on.",
-				Options = Aurexis:RefreshConfigList(),
-				CurrentOption = {},
-				MultipleOptions = false,
-				SpecialType = nil,
-				Callback = function(Value)
-					selectedConfig = Value
-				end,
-			})
-
-			Tab:CreateButton({
-				Name = "Load Config",
-				Description = "Load your saved config settings.",
-				Callback = function()
-					local success, returned = Aurexis:LoadConfig(selectedConfig)
-					if not success then
-						Aurexis:Notification({
-							Title = "Interface",
-							Icon = "error",
-							ImageSource = "Material",
-							Content = "Unable to load config, return error: " .. returned
-						})
-						return
-					end
-
-					Aurexis:Notification({
-						Title = "Interface",
-						Icon = "info",
-						ImageSource = "Material",
-						Content = string.format("Loaded config %q", selectedConfig),
-					})
-				end
-			})
-
-			Tab:CreateButton({
-				Name = "Overwrite Config",
-				Description = "Overwrite your current config settings.",
-				Callback = function()
-					local success, returned = Aurexis:SaveConfig(selectedConfig)
-					if not success then
-						Aurexis:Notification({
-							Title = "Interface",
-							Icon = "error",
-							ImageSource = "Material",
-							Content = "Unable to overwrite config, return error: " .. returned
-						})
-						return
-					end
-
-					Aurexis:Notification({
-						Title = "Interface",
-						Icon = "info",
-						ImageSource = "Material",
-						Content = string.format("Overwrote config %q", selectedConfig),
-					})
-				end
-			})
-
-			Tab:CreateButton({
-				Name = "Refresh Config List",
-				Description = "Refresh the current config list.",
-				Callback = function()
-					configSelection:Set({ Options = Aurexis:RefreshConfigList() })
-				end,
-			})
-
-			local loadlabel
-			Tab:CreateButton({
-				Name = "Set as autoload",
-				Description = "Set a config to auto load setting in your next session.",
-				Callback = function()
-					local name = selectedConfig
-					writefile(Aurexis.Folder .. "/settings/autoload.txt", name)
-					loadlabel:Set({ Text = "Current autoload config: " .. name })
-
-					Aurexis:Notification({
-						Title = "Interface",
-						Icon = "info",
-						ImageSource = "Material",
-						Content = string.format("Set %q to auto load", name),
-					})
-				end,
-			})
-
-			loadlabel = Tab:CreateParagraph({
-				Title = "Current Auto Load",
-				Text = "None"
-			})
-
-			Tab:CreateButton({
-				Name = "Delete Autoload",
-				Description = "Delete The Autoload File",
-				Callback = function()
-					local name = selectedConfig
-					delfile(Aurexis.Folder .. "/settings/autoload.txt")
-					loadlabel:Set({ Text = "None" })
-
-					Aurexis:Notification({
-						Title = "Interface",
-						Icon = "info",
-						ImageSource = "Material",
-						Content = "Deleted Autoload",
-					})
-				end,
-			})
-
-			if isfile(Aurexis.Folder .. "/settings/autoload.txt") then
-				local name = readfile(Aurexis.Folder .. "/settings/autoload.txt")
-				loadlabel:Set( { Text = "Current autoload config: " .. name })
-			end     
-		end
-
-		local ClassParser = {
-			["Toggle"] = {
-				Save = function(Flag, data)
-					return {
-						type = "Toggle", 
-						flag = Flag, 
-						state = data.CurrentValue or false
-					}
-				end,
-				Load = function(Flag, data)
-					if Aurexis.Options[Flag] then
-						Aurexis.Options[Flag]:Set({ CurrentValue = data.state })
-					end
-				end
-			},
-			["Slider"] = {
-				Save = function(Flag, data)
-					return {
-						type = "Slider", 
-						flag = Flag, 
-						value = (data.CurrentValue and tostring(data.CurrentValue)),
-					}
-				end,
-				Load = function(Flag, data)
-					if Aurexis.Options[Flag] and data.value then
-						Aurexis.Options[Flag]:Set({ CurrentValue = data.value })
-					end
-				end
-			},
-			["Input"] = {
-				Save = function(Flag, data)
-					return {
-						type = "Input", 
-						flag = Flag, 
-						text = data.CurrentValue
-					}
-				end,
-				Load = function(Flag, data)
-					if Aurexis.Options[Flag] and data.text and type(data.text) == "string" then
-						Aurexis.Options[Flag]:Set({ CurrentValue = data.text })
-					end
-				end
-			},
-			["Dropdown"] = {
-				Save = function(Flag, data)
-					return {
-						type = "Dropdown", 
-						flag = Flag, 
-						value = data.CurrentOption
-					}
-				end,
-				Load = function(Flag, data)
-					if Aurexis.Options[Flag] and data.value then
-						Aurexis.Options[Flag]:Set({ CurrentOption = data.value })
-					end
-				end
-			},
-			-- buggy as hell stil
-			["Colorpicker"] = {
-				Save = function(Flag, data)
-					local function Color3ToHex(color)
-						return string.format("#%02X%02X%02X", math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255))
-					end
-
-					return {
-						type = "Colorpicker", 
-						flag = Flag, 
-						color = Color3ToHex(data.Color) or nil,
-						alpha = data.Alpha
-					}
-				end,
-				Load = function(Flag, data)
-					local function HexToColor3(hex)
-						local r = tonumber(hex:sub(2, 3), 16) / 255
-						local g = tonumber(hex:sub(4, 5), 16) / 255
-						local b = tonumber(hex:sub(6, 7), 16) / 255
-						return Color3.new(r, g, b)
-					end
-
-					if Aurexis.Options[Flag] and data.color then
-						Aurexis.Options[Flag]:Set({Color = HexToColor3(data.color)})
-					end
-				end
-			}
-		}
-
-
-		function Tab:BuildThemeSection()
-
-			local Title = Elements.Template.Title:Clone()
-			Title.Text = "Theming"
-			Title.Visible = true
-			Title.Parent = TabPage
-			Title.TextTransparency = 1
-			TweenService:Create(Title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
-
-			Tab:CreateSection("Custom Editor")
-
-			local c1cp = Tab:CreateColorPicker({
-				Name = "Color 1",
-				Color = Color3.fromRGB(117, 164, 206),
-			}, "AurexisInterfaceSuitePrebuiltCPC1") -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
-
-			local c2cp = Tab:CreateColorPicker({
-				Name = "Color 2",
-				Color = Color3.fromRGB(123, 201, 201),
-			}, "AurexisInterfaceSuitePrebuiltCPC2")
-
-			local c3cp = Tab:CreateColorPicker({
-				Name = "Color 3",
-				Color = Color3.fromRGB(224, 138, 184),
-			}, "AurexisInterfaceSuitePrebuiltCPC3") 
-
-			task.wait(1)
-
-			c1cp:Set({
-				Callback = function(Value)
-					if c2cp and c3cp then
-						Aurexis.ThemeGradient = ColorSequence.new{ColorSequenceKeypoint.new(0.00, Value or Color3.fromRGB(255,255,255)), ColorSequenceKeypoint.new(0.50, c2cp.Color or Color3.fromRGB(255,255,255)), ColorSequenceKeypoint.new(1.00, c3cp.Color or Color3.fromRGB(255,255,255))}
-						AurexisUI.ThemeRemote.Value = not AurexisUI.ThemeRemote.Value
-					end
-				end
-			})
-
-			c2cp:Set({
-				Callback = function(Value)
-					if c1cp and c3cp then
-						Aurexis.ThemeGradient = ColorSequence.new{ColorSequenceKeypoint.new(0.00, c1cp.Color or Color3.fromRGB(255,255,255)), ColorSequenceKeypoint.new(0.50, Value or Color3.fromRGB(255,255,255)), ColorSequenceKeypoint.new(1.00, c3cp.Color or Color3.fromRGB(255,255,255))}
-						AurexisUI.ThemeRemote.Value = not AurexisUI.ThemeRemote.Value
-					end
-				end
-			})
-
-			c3cp:Set({
-				Callback = function(Valuex)
-					if c2cp and c1cp then
-						Aurexis.ThemeGradient = ColorSequence.new{ColorSequenceKeypoint.new(0.00, c1cp.Color or Color3.fromRGB(255,255,255)), ColorSequenceKeypoint.new(0.50, c2cp.Color or Color3.fromRGB(255,255,255)), ColorSequenceKeypoint.new(1.00, Valuex or Color3.fromRGB(255,255,255))}
-						AurexisUI.ThemeRemote.Value = not AurexisUI.ThemeRemote.Value
-					end
-				end
-			})
-
-			Tab:CreateSection("Preset Gradients")
-
-			for i,v in pairs(PresetGradients) do
-				Tab:CreateButton({
-					Name = tostring(i),
-					Callback = function()
-						c1cp:Set({ Color = v[1] })
-						c2cp:Set({ Color = v[2] })
-						c3cp:Set({ Color = v[3] })
-					end,
-				})
-			end
-
-		end
-
-
-		local function BuildFolderTree()
-			if isStudio then return "Config system unavailable." end
-			local paths = {
-				Aurexis.Folder,
-				Aurexis.Folder .. "/settings"
-			}
-
-			for i = 1, #paths do
-				local str = paths[i]
-				if not isfolder(str) then
-					makefolder(str)
-				end
-			end
-		end
-
-		local function SetFolder()
-
-			if isStudio then return "Config system unavailable." end
-
-			if WindowSettings.ConfigSettings.RootFolder ~= nil and WindowSettings.ConfigSettings.RootFolder ~= "" then
-				Aurexis.Folder = WindowSettings.ConfigSettings.RootFolder .. "/" .. WindowSettings.ConfigSettings.ConfigFolder
-			else
-				Aurexis.Folder = WindowSettings.ConfigSettings.ConfigFolder
-			end
-
-			BuildFolderTree()
-		end
-
-		SetFolder()
-
-		function Aurexis:SaveConfig(Path)
-			if isStudio then return "Config system unavailable." end
-
-			if (not Path) then
-				return false, "Please select a config file."
-			end
-
-			local fullPath = Aurexis.Folder .. "/settings/" .. Path .. ".aurexis"
-
-			local data = {
-				objects = {}
-			}
-
-			for flag, option in next, Aurexis.Options do
-				if not ClassParser[option.Class] then continue end
-				if option.IgnoreConfig then continue end
-
-				table.insert(data.objects, ClassParser[option.Class].Save(flag, option))
-			end	
-
-			local success, encoded = pcall(HttpService.JSONEncode, HttpService, data)
-			if not success then
-				return false, "Unable to encode into JSON data"
-			end
-
-			writefile(fullPath, encoded)
-			return true
-		end
-
-		function Aurexis:LoadConfig(Path)
-			if isStudio then return "Config system unavailable." end
-
-			if (not Path) then
-				return false, "Please select a config file."
-			end
-
-			local file = Aurexis.Folder .. "/settings/" .. Path .. ".aurexis"
-			if not isfile(file) then return false, "Invalid file" end
-
-			local success, decoded = pcall(HttpService.JSONDecode, HttpService, readfile(file))
-			if not success then return false, "Unable to decode JSON data." end
-
-			for _, option in next, decoded.objects do
-				if ClassParser[option.type] then
-					task.spawn(function() 
-						ClassParser[option.type].Load(option.flag, option) 
-					end)
-				end
-			end
-
-			return true
-		end
-
-		function Aurexis:LoadAutoloadConfig()
-			if isfile(Aurexis.Folder .. "/settings/autoload.txt") then
-
-				if isStudio then return "Config system unavailable." end
-
-				local name = readfile(Aurexis.Folder .. "/settings/autoload.txt")
-
-				local success, err = Aurexis:LoadConfig(name)
-				if not success then
-					return Aurexis:Notification({
-						Title = "Interface",
-						Icon = "sparkle",
-						ImageSource = "Material",
-						Content = "Failed to load autoload config: " .. err,
-					})
-				end
-
-				Aurexis:Notification({
-					Title = "Interface",
-					Icon = "sparkle",
-					ImageSource = "Material",
-					Content = string.format("Auto loaded config %q", name),
-				})
-
-			end 
-		end
-
-		function Aurexis:RefreshConfigList()
-			if isStudio then return "Config system unavailable." end
-
-			local list = listfiles(Aurexis.Folder .. "/settings")
-
-			local out = {}
-			for i = 1, #list do
-				local file = list[i]
-				if file:sub(-5) == ".aurexis" then
-					local pos = file:find(".aurexis", 1, true)
-					local start = pos
-
-					local char = file:sub(pos, pos)
-					while char ~= "/" and char ~= "\\" and char ~= "" do
-						pos = pos - 1
-						char = file:sub(pos, pos)
-					end
-
-					if char == "/" or char == "\\" then
-						local name = file:sub(pos + 1, start - 1)
-						if name ~= "options" then
-							table.insert(out, name)
-						end
-					end
-				end
-			end
-
-			return out
-		end
 		return Tab
 	end
 
@@ -4866,29 +2049,350 @@ FirstTab = false
 	Navigation.Visible = true
 	tween(Navigation.Line, {BackgroundTransparency = 0})
 
-	for _, TopbarButton in ipairs(Main.Controls:GetChildren()) do
-		if TopbarButton.ClassName == "Frame" and TopbarButton.Name ~= "Theme" then
-			TopbarButton.Visible = true
-			tween(TopbarButton, {BackgroundTransparency = 0.25})
-			tween(TopbarButton.UIStroke, {Transparency = 0.5})
-			tween(TopbarButton.ImageLabel, {ImageTransparency = 0.25})
+	setTopbarVisible(true)
+
+	local function getTopbarIcon(container)
+		if not container then
+			return nil
 		end
+		return container:FindFirstChildWhichIsA("ImageButton") or container:FindFirstChildWhichIsA("ImageLabel")
 	end
 
-	Main.Controls.Close.ImageLabel.MouseButton1Click:Connect(function()
-		Hide(Main, Window.Bind, true)
-		dragBar.Visible = false
+	local function collapseWindow(showNotification)
+		Hide(Main, Window.Bind, showNotification)
+		if dragBar then
+			dragBar.Visible = false
+		end
 		Window.State = false
 		if UserInputService.KeyboardEnabled == false then
 			AurexisUI.MobileSupport.Visible = true
 		end
-	end)
-	Main.Controls.Close["MouseEnter"]:Connect(function()
-		tween(Main.Controls.Close.ImageLabel, {ImageColor3 = Color3.new(1,1,1)})
-	end)
-	Main.Controls.Close["MouseLeave"]:Connect(function()
-		tween(Main.Controls.Close.ImageLabel, {ImageColor3 = Color3.fromRGB(195,195,195)})
-	end)
+	end
+
+	closeDialogState = {
+		host = nil,
+		dialog = nil,
+		targetSize = nil,
+		scrollers = {},
+	}
+
+	local function getMainCornerRadius()
+		local defaultRadius = UDim.new(0, 12)
+		if Main then
+			local mainCorner = Main:FindFirstChildWhichIsA("UICorner")
+			if mainCorner then
+				return mainCorner.CornerRadius
+			end
+		end
+		return defaultRadius
+	end
+
+	local function applyRoundedCorner(target)
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = getMainCornerRadius()
+		corner.Parent = target
+		return corner
+	end
+
+	local function teardownCloseDialog()
+		if closeDialogState.scrollers then
+			for scroller, state in pairs(closeDialogState.scrollers) do
+				if scroller and scroller.Parent then
+					if scroller:IsA("ScrollingFrame") then
+						scroller.ScrollingEnabled = state
+					elseif scroller:IsA("UIPageLayout") and type(state) == "table" then
+						if state.ScrollWheelInputEnabled ~= nil then
+							pcall(function() scroller.ScrollWheelInputEnabled = state.ScrollWheelInputEnabled end)
+						end
+						if state.SwipeEnabled ~= nil then
+							pcall(function() scroller.SwipeEnabled = state.SwipeEnabled end)
+						end
+					end
+				end
+			end
+		end
+		if closeDialogState.host then
+			closeDialogState.host:Destroy()
+		end
+		closeDialogState = {host = nil, dialog = nil, targetSize = nil, scrollers = {}}
+	end
+
+	local function buildCloseDialog()
+		local container = Main or Elements
+		if not container then
+			return nil, nil
+		end
+
+		teardownCloseDialog()
+
+		local scrollers = {}
+		for _, descendant in ipairs(container:GetDescendants()) do
+			if descendant:IsA("ScrollingFrame") then
+				scrollers[descendant] = descendant.ScrollingEnabled
+				descendant.ScrollingEnabled = false
+			end
+		end
+
+		if Elements and Elements.UIPageLayout then
+			local pageLayout = Elements.UIPageLayout
+			local originalStates = {}
+
+			local s_sw, r_sw = pcall(function() return pageLayout.ScrollWheelInputEnabled end)
+			if s_sw then
+				originalStates.ScrollWheelInputEnabled = r_sw
+				pcall(function() pageLayout.ScrollWheelInputEnabled = false end)
+			end
+
+			local s_se, r_se = pcall(function() return pageLayout.SwipeEnabled end)
+			if s_se then
+				originalStates.SwipeEnabled = r_se
+				pcall(function() pageLayout.SwipeEnabled = false end)
+			end
+
+			scrollers[pageLayout] = originalStates
+		end
+
+		local host = Instance.new("Frame")
+		host.Name = "CloseDialogHost"
+		host.BackgroundColor3 = Color3.fromRGB(6, 8, 14)
+		host.BackgroundTransparency = 1
+		host.BorderSizePixel = 0
+		host.Size = UDim2.fromScale(1, 1)
+		host.Position = UDim2.fromScale(0, 0)
+		host.ZIndex = 250
+		host.Active = true
+		host.ClipsDescendants = true
+		host.Parent = container
+		applyRoundedCorner(host)
+
+		local scrim = Instance.new("UIGradient")
+		scrim.Color = ColorSequence.new{
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(16, 20, 30)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(6, 8, 14)),
+		}
+		scrim.Transparency = NumberSequence.new{
+			NumberSequenceKeypoint.new(0, 0.08),
+			NumberSequenceKeypoint.new(1, 0.2),
+		}
+		scrim.Rotation = 90
+		scrim.Parent = host
+
+		local grain = Instance.new("ImageLabel")
+		grain.Name = "OverlayNoise"
+		grain.BackgroundTransparency = 1
+		grain.AnchorPoint = Vector2.new(0.5, 0.5)
+		grain.Position = UDim2.fromScale(0.5, 0.5)
+		grain.Size = UDim2.new(1.04, 0, 1.04, 0)
+		grain.Image = "rbxassetid://13160452170"
+		grain.ImageColor3 = Color3.fromRGB(12, 16, 24)
+		grain.ImageTransparency = 0.77
+		grain.ScaleType = Enum.ScaleType.Slice
+		grain.SliceCenter = Rect.new(60, 60, 60, 60)
+		grain.ZIndex = host.ZIndex + 1
+		grain.Parent = host
+
+		local vignette = Instance.new("ImageLabel")
+		vignette.Name = "Backdrop"
+		vignette.BackgroundTransparency = 1
+		vignette.AnchorPoint = Vector2.new(0.5, 0.5)
+		vignette.Position = UDim2.fromScale(0.5, 0.5)
+		vignette.Size = UDim2.new(1.08, 0, 1.08, 0)
+		vignette.Image = "rbxassetid://13160452170"
+		vignette.ImageColor3 = Color3.fromRGB(10, 14, 22)
+		vignette.ImageTransparency = 0.94
+		vignette.ScaleType = Enum.ScaleType.Slice
+		vignette.SliceCenter = Rect.new(60, 60, 60, 60)
+		vignette.ZIndex = host.ZIndex + 1
+		vignette.Parent = host
+
+		local dialogWidth = 420
+		if Main then
+			dialogWidth = math.clamp(Main.AbsoluteSize.X - 140, 320, 520)
+		end
+
+		local dialog = Instance.new("Frame")
+		dialog.Name = "Dialog"
+		dialog.AnchorPoint = Vector2.new(0.5, 0.5)
+		dialog.Position = UDim2.fromScale(0.5, 0.5)
+		dialog.Size = UDim2.fromOffset(dialogWidth - 20, 204)
+		dialog.BackgroundColor3 = Main and Main.BackgroundColor3 or Color3.fromRGB(20, 24, 32)
+		dialog.BackgroundTransparency = 0.22
+		dialog.BorderSizePixel = 0
+		dialog.ZIndex = host.ZIndex + 2
+		dialog.ClipsDescendants = true
+		dialog.Parent = host
+		applyRoundedCorner(dialog)
+
+		local dialogGradient = Instance.new("UIGradient")
+		dialogGradient.Color = Aurexis.ThemeGradient
+		dialogGradient.Rotation = 125
+		dialogGradient.Transparency = NumberSequence.new{
+			NumberSequenceKeypoint.new(0, 0.82),
+			NumberSequenceKeypoint.new(0.5, 0.9),
+			NumberSequenceKeypoint.new(1, 0.82),
+		}
+		dialogGradient.Parent = dialog
+
+		local padding = Instance.new("UIPadding")
+		padding.PaddingTop = UDim.new(0, 22)
+		padding.PaddingBottom = UDim.new(0, 22)
+		padding.PaddingLeft = UDim.new(0, 22)
+		padding.PaddingRight = UDim.new(0, 22)
+		padding.Parent = dialog
+
+		local title = Instance.new("TextLabel")
+		title.Name = "Title"
+		title.BackgroundTransparency = 1
+		title.Size = UDim2.new(1, 0, 0, 30)
+		title.Font = Enum.Font.GothamBold
+		title.Text = "Close window?"
+		title.TextColor3 = Color3.fromRGB(255, 255, 255)
+		title.TextSize = 20
+		title.TextXAlignment = Enum.TextXAlignment.Left
+		title.TextTransparency = 0
+		title.ZIndex = dialog.ZIndex + 1
+		title.Parent = dialog
+
+		local message = Instance.new("TextLabel")
+		message.Name = "Message"
+		message.BackgroundTransparency = 1
+		message.Position = UDim2.new(0, 0, 0, 34)
+		message.Size = UDim2.new(1, 0, 0, 64)
+		message.Font = Enum.Font.Gotham
+		message.Text = "Are you sure you want to close this window?"
+		message.TextColor3 = Color3.fromRGB(220, 224, 232)
+		message.TextSize = 15
+		message.TextWrapped = true
+		message.TextXAlignment = Enum.TextXAlignment.Left
+		message.TextYAlignment = Enum.TextYAlignment.Top
+		message.TextTransparency = 0
+		message.ZIndex = dialog.ZIndex + 1
+		message.Parent = dialog
+
+		local buttonRow = Instance.new("Frame")
+		buttonRow.Name = "Buttons"
+		buttonRow.AnchorPoint = Vector2.new(0.5, 1)
+		buttonRow.BackgroundTransparency = 1
+		buttonRow.Position = UDim2.new(0.5, 0, 1, -8)
+		buttonRow.Size = UDim2.new(1, 0, 0, 52)
+		buttonRow.ZIndex = dialog.ZIndex + 1
+		buttonRow.Parent = dialog
+
+		local buttonLayout = Instance.new("UIListLayout")
+		buttonLayout.FillDirection = Enum.FillDirection.Horizontal
+		buttonLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+		buttonLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+		buttonLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		buttonLayout.Padding = UDim.new(0, 10)
+		buttonLayout.Parent = buttonRow
+
+		local function makeButton(name, text, primary)
+			local btn = Instance.new("TextButton")
+			btn.Name = name
+			btn.AutoButtonColor = false
+			btn.BackgroundColor3 = primary and Color3.fromRGB(70, 98, 255) or Color3.fromRGB(32, 36, 46)
+			btn.BackgroundTransparency = primary and 0 or 0.2
+			btn.BorderSizePixel = 0
+			btn.Size = UDim2.new(0.5, -5, 1, 0)
+			btn.Font = Enum.Font.GothamMedium
+			btn.Text = text
+			btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+			btn.TextSize = 16
+			btn.TextTransparency = 0
+			btn.ZIndex = dialog.ZIndex + 1
+			btn.Parent = buttonRow
+
+			applyRoundedCorner(btn)
+
+			local stroke = Instance.new("UIStroke")
+			stroke.Color = Color3.fromRGB(90, 110, 150)
+			stroke.Transparency = primary and 0.32 or 0.2
+			stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+			stroke.Parent = btn
+
+			if primary then
+				local grad = Instance.new("UIGradient")
+				grad.Color = Aurexis.ThemeGradient
+				grad.Rotation = 20
+				grad.Transparency = NumberSequence.new{
+					NumberSequenceKeypoint.new(0, 0.05),
+					NumberSequenceKeypoint.new(1, 0.25),
+				}
+				grad.Parent = btn
+			end
+
+			return btn
+		end
+
+		local cancelButton = makeButton("Cancel", "Cancel", false)
+		cancelButton.LayoutOrder = 1
+
+		local confirmButton = makeButton("Confirm", "Close", true)
+		confirmButton.LayoutOrder = 2
+
+		cancelButton.MouseButton1Click:Connect(function()
+			teardownCloseDialog()
+		end)
+
+		confirmButton.MouseButton1Click:Connect(function()
+			teardownCloseDialog()
+			Window.State = true
+			if dragBar then
+				dragBar.Visible = false
+			end
+			setMobileInputBlocked(false)
+			Aurexis:Destroy()
+		end)
+
+		local targetSize = UDim2.fromOffset(dialogWidth, 220)
+
+		closeDialogState = {
+			host = host,
+			dialog = dialog,
+			targetSize = targetSize,
+			scrollers = scrollers,
+		}
+
+		return host, dialog
+	end
+
+	local function showCloseConfirmation()
+		local host, dialog = buildCloseDialog()
+		if not (host and dialog) then
+			return
+		end
+
+		local targetSize = closeDialogState.targetSize or dialog.Size
+
+		tween(host, {BackgroundTransparency = 0.05})
+		tween(dialog, {Size = targetSize, BackgroundTransparency = 0.05})
+	end
+
+	local minimizeIcon = getTopbarIcon(minimizeButton)
+	if minimizeButton and minimizeIcon then
+		minimizeIcon.MouseButton1Click:Connect(function()
+			collapseWindow(true)
+		end)
+		minimizeButton.MouseEnter:Connect(function()
+			tween(minimizeIcon, {ImageColor3 = Color3.new(1, 1, 1)})
+		end)
+		minimizeButton.MouseLeave:Connect(function()
+			tween(minimizeIcon, {ImageColor3 = Color3.fromRGB(195, 195, 195)})
+		end)
+	end
+
+	local closeIcon = getTopbarIcon(closeButton)
+	if closeButton and closeIcon then
+		closeIcon.MouseButton1Click:Connect(function()
+			showCloseConfirmation()
+		end)
+		closeButton.MouseEnter:Connect(function()
+			tween(closeIcon, {ImageColor3 = Color3.new(1, 1, 1)})
+		end)
+		closeButton.MouseLeave:Connect(function()
+			tween(closeIcon, {ImageColor3 = Color3.fromRGB(195, 195, 195)})
+		end)
+	end
 
 	UserInputService.InputBegan:Connect(function(input, gpe)
 		if gpe then return end
@@ -4911,22 +2415,31 @@ FirstTab = false
 		end
 	end)
 
-	Main.Controls.ToggleSize.ImageLabel.MouseButton1Click:Connect(function()
-		Window.Size = not Window.Size
-		if Window.Size then
-			Minimize(Main)
-			dragBar.Visible = false
-		else
-			Maximise(Main)
-			dragBar.Visible = true
-		end
-	end)
-	Main.Controls.ToggleSize["MouseEnter"]:Connect(function()
-		tween(Main.Controls.ToggleSize.ImageLabel, {ImageColor3 = Color3.new(1,1,1)})
-	end)
-	Main.Controls.ToggleSize["MouseLeave"]:Connect(function()
-		tween(Main.Controls.ToggleSize.ImageLabel, {ImageColor3 = Color3.fromRGB(195,195,195)})
-	end)
+	local toggleSizeIcon = toggleSizeButton and (toggleSizeButton:FindFirstChildWhichIsA("ImageButton") or toggleSizeButton:FindFirstChildWhichIsA("ImageLabel"))
+	if toggleSizeIcon then
+		toggleSizeIcon.MouseButton1Click:Connect(function()
+			Window.Size = not Window.Size
+			if Window.Size then
+				Minimize(Main)
+				if dragBar then
+					dragBar.Visible = false
+				end
+			else
+				Maximise(Main)
+				if dragBar then
+					dragBar.Visible = true
+				end
+			end
+		end)
+	end
+	if toggleSizeButton and toggleSizeIcon then
+		toggleSizeButton.MouseEnter:Connect(function()
+			tween(toggleSizeIcon, {ImageColor3 = Color3.new(1,1,1)})
+		end)
+		toggleSizeButton.MouseLeave:Connect(function()
+			tween(toggleSizeIcon, {ImageColor3 = Color3.fromRGB(195,195,195)})
+		end)
+	end
 
 	Main.Controls.Theme.ImageLabel.MouseButton1Click:Connect(function()
 		if Window.Settings then
@@ -4952,6 +2465,57 @@ FirstTab = false
 	return Window
 end
 
+Aurexis.SetEnvironmentBlurEnabled = function(self, enabled)
+	enabled = not not enabled
+	if Aurexis.AllowEnvironmentBlur == enabled then
+		return enabled
+	end
+
+	Aurexis.AllowEnvironmentBlur = enabled
+
+	if not enabled then
+		if sharedDepthOfField then
+			sharedDepthOfField.Enabled = false
+			if sharedDepthOfField.Parent == Lighting then
+				sharedDepthOfField.Parent = nil
+			end
+			sharedDepthOfField = nil
+		end
+		local existing = Lighting:FindFirstChild("AurexisDepthOfField")
+		if existing then
+			existing.Enabled = false
+			existing:Destroy()
+		end
+		local toCleanup = {}
+		for guiObject in pairs(blurBindings) do
+			table.insert(toCleanup, guiObject)
+		end
+		for _, guiObject in ipairs(toCleanup) do
+			if guiObject then
+				cleanupBlur(guiObject)
+			end
+		end
+	else
+		local effect = ensureDepthOfField()
+		if effect then
+			effect.Enabled = activeBlurCount > 0
+		end
+		for guiObject in pairs(blurTargets) do
+			if guiObject and guiObject.Parent then
+				ensureGuiBlur(guiObject)
+			end
+		end
+	end
+
+	return enabled
+end
+
+Aurexis.GetEnvironmentBlurEnabled = function()
+	return Aurexis.AllowEnvironmentBlur
+end
+
+Aurexis:SetEnvironmentBlurEnabled(Aurexis.AllowEnvironmentBlur)
+
 function Aurexis:Destroy()
     Main.Visible = false
     for _, Notification in ipairs(Notifications:GetChildren()) do
@@ -4960,6 +2524,8 @@ function Aurexis:Destroy()
             Notification:Destroy()
         end
     end
+    topbarButtons = {}
+    topbarDecorations = {}
     AurexisUI:Destroy()
 end
 

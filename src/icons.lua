@@ -2,6 +2,7 @@
 return {
 	Lucide = {},
 	Material = {
+		["test_for_settings"] = "http://www.roblox.com/asset/?id=77711505718364";
 		["_add_alert"] = "http://www.roblox.com/asset/?id=6031071067";
 		["_auto_delete"] = "http://www.roblox.com/asset/?id=6031071068";
 		["_error"] = "http://www.roblox.com/asset/?id=6031071057";

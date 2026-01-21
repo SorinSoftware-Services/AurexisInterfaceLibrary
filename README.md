@@ -1,4 +1,4 @@
-# SorinInterfaceUI Information
+# AurexisInterfaceUI Information
 ![SorinInterfaceUI](https://i.postimg.cc/MGZdtPpf/Aurexis-Interface-Library.png)
 
 #### This library is based on the **Luna Interface Suite** by *Nebula Softworks* and has been rebuilt and extended by **SorinSoftware Services** — offering a modern, fast, and visually refined UI experience.  
@@ -14,7 +14,7 @@
 The main goal of this rebuilt library is to **modularize and simplify** the entire codebase —  
 making it easier to modify, enhance, and extend with new features.  
 
-_Last updated: October 2025 for SorinInterfaceUI Beta 0.3_
+_Last updated: October 2025 for AurexisInterfaceUI Beta 0.3_
 
 ---
 

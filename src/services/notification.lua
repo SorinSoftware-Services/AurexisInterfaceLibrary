@@ -19,6 +19,7 @@ return function(Aurexis, Kwargify, BlurModule, TweenService, Notifications)
 			newNotification.Title.Text = data.Title
 			newNotification.Description.Text = data.Content 
 			newNotification.Icon.Image = Aurexis:GetIcon(data.Icon, data.ImageSource)
+			newNotification.Description.TextWrapped = true
 
 			newNotification.BackgroundTransparency = 1
 			newNotification.Title.TextTransparency = 1
@@ -29,6 +30,7 @@ return function(Aurexis, Kwargify, BlurModule, TweenService, Notifications)
 			newNotification.Icon.BackgroundTransparency = 1
 
 			task.wait()
+
 			newNotification.Size = UDim2.new(1, 0, 0, -Notifications:FindFirstChild("UIListLayout").Padding.Offset)
 			newNotification.Icon.Size = UDim2.new(0, 28, 0, 28)
 			newNotification.Icon.Position = UDim2.new(0, 16, 0.5, -1)
