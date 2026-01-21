@@ -10,9 +10,9 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 
 	HomeTabSettings = Kwargify({
 		Icon = 1,
-		GoodExecutors = {"Krnl", "Delta", "Wave", "Seliware", "Velocity", "Volcano", "MacSploit", "Macsploit", "Bunni", "Hydrogen", "Volt", "Sirhut", "Potassium"},
+		GoodExecutors = {"Delta", "Wave", "Seliware", "Velocity", "Volcano", "MacSploit", "Macsploit", "Bunni", "Hydrogen", "Volt", "Sirhut"},
 		BadExecutors = {"Solara", "Xeno"},
-		DetectedExecutors = {"Swift", "Valex", "Nucleus", "Codex"},
+		DetectedExecutors = {"Swift", "Valex", "Nucleus", "Codex", "Potassium", "Krnl"},
 		DiscordInvite = "XC5hpQQvMX" -- Only the invite code, not the full URL.
 	}, HomeTabSettings or {})
 
@@ -132,7 +132,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			message = "Weak executor. Some scripts will not work"
 		elseif table.find(HomeTabSettings.DetectedExecutors, exec) then
 			color = Color3.fromRGB(255, 60, 60)
-			message = "This executor is detected. Please don´t use them!"
+			message = "This executor might be detected. Use with caution"
 		else
 			color = Color3.fromRGB(200, 200, 200)
 			message = "This executor isn't in my list. No idea if it's good or bad."
@@ -244,19 +244,19 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 
 	local diagnosticsStyles = {
 		clear = {
-			label = "All clear - no performance issues detected.",
+			label = "No performance issues detected.",
 			valueColor = Color3.fromRGB(120, 255, 150),
 			strokeColor = Color3.fromRGB(120, 255, 150),
 			strokeTransparency = 0.35,
 		},
 		pending = {
-			label = "Sending diagnostics to backend ...",
+			label = "Sending diagnostics...",
 			valueColor = Color3.fromRGB(255, 205, 90),
 			strokeColor = Color3.fromRGB(255, 205, 90),
 			strokeTransparency = 0.25,
 		},
 		issues = {
-			label = "Diagnostics available - potential performance issues found.",
+			label = "Potential performance issues found.",
 			valueColor = Color3.fromRGB(255, 170, 95),
 			strokeColor = Color3.fromRGB(255, 170, 95),
 			strokeTransparency = 0.2,
