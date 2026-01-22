@@ -2,7 +2,6 @@
 
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
-local TeleportService = game:GetService("TeleportService")
 local RunService = game:GetService("RunService")
 local Stats = game:GetService("Stats")
 
@@ -17,14 +16,10 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		BadExecutors = {"Solara", "Xeno"},
 		DetectedExecutors = {"Swift", "Valex", "Nucleus", "Codex"},
 		DiscordInvite = "XC5hpQQvMX", -- Only the invite code, not the full URL.
-		GameManagerUrl = "https://scripts.sorinservice.online/sorin/game-manager",
-		AutoExecScript = 'loadstring(game:HttpGet("https://scripts.sorinservice.online/sorin/script_hub.lua"))()',
 		Supabase = {
 			url = "https://udnvaneupscmrgwutamv.supabase.co",
 			anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkbnZhbmV1cHNjbXJnd3V0YW12Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ1NjEyMzAsImV4cCI6MjA3MDEzNzIzMH0.7duKofEtgRarIYDAoMfN7OEkOI_zgkG2WzAXZlxl5J0",
 			feedbackFunction = "submit_feedback",
-			gamesEndpoint = "/rest/v1/games",
-			gamesQuery = "?select=name,place_id,universe_id,is_active&is_active=eq.true&order=name.asc",
 		},
 	}, HomeTabSettings or {})
 
@@ -211,8 +206,6 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		url = "",
 		anonKey = "",
 		feedbackFunction = "submit_feedback",
-		gamesEndpoint = "/rest/v1/games",
-		gamesQuery = "?select=name,place_id,universe_id,is_active&is_active=eq.true&order=name.asc",
 	}
 
 	if type(HomeTabSettings.Supabase) == "table" then
@@ -702,174 +695,6 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		return fpsAccumulator.current
 	end
 
-	local rootPlaceCache = {}
-	local pendingTeleport = nil
-	local teleportFailConn = nil
-
-	local TeleportErrorMessages = {
-		[Enum.TeleportResult.GameNotFound] = "Game not found or not public.",
-		[Enum.TeleportResult.GameEnded] = "This game session ended.",
-		[Enum.TeleportResult.GameFull] = "Server full. Try again.",
-		[Enum.TeleportResult.Unauthorized] = "Teleport restricted (773).",
-		[Enum.TeleportResult.NotAllowed] = "Teleport not allowed for this place.",
-		[Enum.TeleportResult.TeleportDisabled] = "Teleport disabled for this place.",
-		[Enum.TeleportResult.Failure] = "Teleport failed. Try again later.",
-	}
-
-	local function fetchRootPlaceId(universeId)
-		if not universeId then
-			return nil, "Missing universeId"
-		end
-
-		local response, err = httpRequest({
-			Url = "https://games.roblox.com/v1/games?universeIds=" .. tostring(universeId),
-			Method = "GET",
-			Headers = {Accept = "application/json"},
-		})
-
-		if not response then
-			return nil, err or "Request failed"
-		end
-
-		local data = decodeJson(response.Body)
-		local record = type(data) == "table" and type(data.data) == "table" and data.data[1] or nil
-		local rootPlaceId = record and record.rootPlaceId or nil
-
-		if not rootPlaceId then
-			return nil, "rootPlaceId missing"
-		end
-
-		return tonumber(rootPlaceId)
-	end
-
-	local function getRootPlaceId(universeId)
-		if not universeId then
-			return nil, "Missing universeId"
-		end
-		if rootPlaceCache[universeId] then
-			return rootPlaceCache[universeId]
-		end
-		local rootId, err = fetchRootPlaceId(universeId)
-		if rootId then
-			rootPlaceCache[universeId] = rootId
-			return rootId
-		end
-		return nil, err
-	end
-
-	local function formatTeleportFailure(result, message)
-		local text = TeleportErrorMessages[result]
-		if not text or text == "" then
-			text = "Teleport failed."
-		end
-		if message and message ~= "" then
-			text = text .. " (" .. tostring(message) .. ")"
-		end
-		return text
-	end
-
-	local function isUnauthorizedTeleport(result, message)
-		if result == Enum.TeleportResult.Unauthorized then
-			return true
-		end
-		if type(message) ~= "string" then
-			return false
-		end
-		local lower = string.lower(message)
-		return lower:find("unauthorized", 1, true) ~= nil
-			or lower:find("different creator", 1, true) ~= nil
-			or lower:find("teleport from this universe", 1, true) ~= nil
-	end
-
-	local function offerManualJoin(entry, fallbackPlaceId)
-		local placeId = fallbackPlaceId
-		if entry and entry.universeId then
-			local rootId = getRootPlaceId(entry.universeId)
-			if rootId then
-				placeId = rootId
-			end
-		end
-		if not placeId then
-			return
-		end
-		local link = "roblox://placeId=" .. tostring(placeId)
-		if typeof(setclipboard) == "function" then
-			pcall(setclipboard, link)
-			notify("Game Teleport", "Teleport blocked. Join link copied to clipboard.", "warning")
-		else
-			notify("Game Teleport", "Teleport blocked. Join via: " .. link, "warning")
-		end
-	end
-
-	local function ensureTeleportFailHandler(teleportFunc)
-		if teleportFailConn then
-			return
-		end
-		teleportFailConn = TeleportService.TeleportInitFailed:Connect(function(player, result, message, placeId, gameId)
-			if player ~= Players.LocalPlayer then
-				return
-			end
-			if not pendingTeleport then
-				return
-			end
-
-			local entry = pendingTeleport.entry
-			local lastPlaceId = pendingTeleport.placeId
-
-			if isUnauthorizedTeleport(result, message) then
-				offerManualJoin(entry, lastPlaceId)
-				pendingTeleport = nil
-				return
-			end
-
-			if pendingTeleport.attemptedRoot then
-				notify("Game Teleport", formatTeleportFailure(result, message), "error")
-				pendingTeleport = nil
-				return
-			end
-
-			if entry and entry.universeId then
-				local rootId = getRootPlaceId(entry.universeId)
-				if rootId and rootId ~= lastPlaceId then
-					pendingTeleport.attemptedRoot = true
-					pendingTeleport.placeId = rootId
-					notify("Game Teleport", "Place restricted. Trying public entry...", "warning")
-					teleportFunc(rootId)
-					return
-				end
-			end
-
-			notify("Game Teleport", formatTeleportFailure(result, message), "error")
-			pendingTeleport = nil
-		end)
-	end
-
-	local function resolveQueueOnTeleport()
-		return (syn and syn.queue_on_teleport)
-			or queue_on_teleport
-			or (fluxus and fluxus.queue_on_teleport)
-	end
-
-	local function resolveAutoExecScript()
-		if type(HomeTabSettings.AutoExecScript) == "string" and HomeTabSettings.AutoExecScript ~= "" then
-			return HomeTabSettings.AutoExecScript
-		end
-		return 'loadstring(game:HttpGet("https://scripts.sorinservice.online/sorin/script_hub.lua"))()'
-	end
-
-	local function queueHubAutoExecute()
-		local q = resolveQueueOnTeleport()
-		if typeof(q) ~= "function" then
-			return false, "queue_on_teleport is not available in this executor"
-		end
-		local scriptSource = resolveAutoExecScript()
-		local ok, err = pcall(q, scriptSource)
-		if not ok then
-			return false, tostring(err)
-		end
-		return true
-	end
-
 	local function clearCard(card, allowed)
 		if not card then
 			return
@@ -1196,20 +1021,20 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		}
 	end
 
-	local function buildTeleportCard(card)
+	local function buildEnvironmentCard(card)
 		if not card then
 			return nil
 		end
 
-		clearCard(card, {TeleportContent = true})
+		clearCard(card, {EnvironmentContent = true})
 		card.ClipsDescendants = true
 
 		local titleLabel = card:FindFirstChild("Title")
 		if titleLabel and titleLabel:IsA("TextLabel") then
-			titleLabel.Text = "Game Teleport (Auto-Exec)"
+			titleLabel.Text = "Environment Stats"
 		end
 
-		local content = createContentFrame(card, "TeleportContent", true)
+		local content = createContentFrame(card, "EnvironmentContent", true)
 		local fontStrong = Enum.Font.GothamSemibold
 		local fontBody = Enum.Font.Gotham
 		local titleColor = (titleLabel and titleLabel.TextColor3) or Color3.fromRGB(240, 240, 240)
@@ -1260,244 +1085,6 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 				statsText.Text = text
 			end
 		end)
-
-		local teleportButton = Instance.new("TextButton")
-		teleportButton.Name = "TeleportButton"
-		teleportButton.AutoButtonColor = false
-		teleportButton.Text = "Teleport & Auto-Execute"
-		teleportButton.Font = fontStrong
-		teleportButton.TextSize = 14
-		teleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-		teleportButton.BackgroundColor3 = Color3.fromRGB(165, 55, 120)
-		teleportButton.Size = UDim2.new(1, 0, 0, 28)
-		teleportButton.LayoutOrder = 2
-		teleportButton.Parent = content
-
-		local teleCorner = Instance.new("UICorner")
-		teleCorner.CornerRadius = UDim.new(0, 6)
-		teleCorner.Parent = teleportButton
-
-		local teleStroke = Instance.new("UIStroke")
-		teleStroke.Transparency = 0.35
-		teleStroke.Color = Color3.fromRGB(190, 85, 150)
-		teleStroke.Parent = teleportButton
-
-		local teleGradient = Instance.new("UIGradient")
-		teleGradient.Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.fromRGB(170, 70, 135)),
-			ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 40, 110)),
-		})
-		teleGradient.Rotation = 10
-		teleGradient.Parent = teleportButton
-
-		local selectLabel = Instance.new("TextLabel")
-		selectLabel.Name = "SelectLabel"
-		selectLabel.BackgroundTransparency = 1
-		selectLabel.TextXAlignment = Enum.TextXAlignment.Left
-		selectLabel.Font = fontStrong
-		selectLabel.TextSize = 12
-		selectLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-		selectLabel.Text = "Select Game"
-		selectLabel.Size = UDim2.new(1, 0, 0, 12)
-		selectLabel.LayoutOrder = 3
-		selectLabel.Parent = content
-
-		local dropdownButton = Instance.new("TextButton")
-		dropdownButton.Name = "GameSelect"
-		dropdownButton.AutoButtonColor = false
-		dropdownButton.Text = "Select a game"
-		dropdownButton.Font = fontBody
-		dropdownButton.TextSize = 13
-		dropdownButton.TextColor3 = Color3.fromRGB(230, 230, 230)
-		dropdownButton.TextXAlignment = Enum.TextXAlignment.Left
-		dropdownButton.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
-		dropdownButton.Size = UDim2.new(1, 0, 0, 28)
-		dropdownButton.LayoutOrder = 4
-		dropdownButton.Parent = content
-
-		local dropdownCorner = Instance.new("UICorner")
-		dropdownCorner.CornerRadius = UDim.new(0, 6)
-		dropdownCorner.Parent = dropdownButton
-
-		local dropdownStroke = Instance.new("UIStroke")
-		dropdownStroke.Transparency = 0.5
-		dropdownStroke.Color = Color3.fromRGB(64, 61, 76)
-		dropdownStroke.Parent = dropdownButton
-
-		local dropdownPadding = Instance.new("UIPadding")
-		dropdownPadding.PaddingLeft = UDim.new(0, 8)
-		dropdownPadding.PaddingRight = UDim.new(0, 20)
-		dropdownPadding.Parent = dropdownButton
-
-		local dropdownArrow = Instance.new("TextLabel")
-		dropdownArrow.Name = "Arrow"
-		dropdownArrow.BackgroundTransparency = 1
-		dropdownArrow.Text = "v"
-		dropdownArrow.Font = fontStrong
-		dropdownArrow.TextSize = 13
-		dropdownArrow.TextColor3 = Color3.fromRGB(200, 200, 200)
-		dropdownArrow.Size = UDim2.new(0, 12, 1, 0)
-		dropdownArrow.Position = UDim2.new(1, -16, 0, 0)
-		dropdownArrow.Parent = dropdownButton
-
-		local dropdownList = Instance.new("ScrollingFrame")
-		dropdownList.Name = "GameList"
-		dropdownList.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
-		dropdownList.BorderSizePixel = 0
-		dropdownList.Active = true
-		dropdownList.ScrollingEnabled = true
-		dropdownList.ScrollBarThickness = 4
-		dropdownList.CanvasSize = UDim2.new(0, 0, 0, 0)
-		dropdownList.Size = UDim2.new(1, 0, 0, 0)
-		dropdownList.Visible = false
-		dropdownList.LayoutOrder = 5
-		dropdownList.ClipsDescendants = true
-		dropdownList.Parent = content
-
-		local listCorner = Instance.new("UICorner")
-		listCorner.CornerRadius = UDim.new(0, 6)
-		listCorner.Parent = dropdownList
-
-		local listStroke = Instance.new("UIStroke")
-		listStroke.Transparency = 0.5
-		listStroke.Color = Color3.fromRGB(64, 61, 76)
-		listStroke.Parent = dropdownList
-
-		local listLayout = Instance.new("UIListLayout")
-		listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-		listLayout.Padding = UDim.new(0, 4)
-		listLayout.Parent = dropdownList
-
-		local maxListHeight = 130
-
-		local function getListHeight()
-			local target = listLayout.AbsoluteContentSize.Y + 8
-			if target < 28 then
-				target = 28
-			end
-			if target > maxListHeight then
-				target = maxListHeight
-			end
-			return target
-		end
-
-		listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-			dropdownList.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 4)
-			if dropdownOpen then
-				dropdownList.Size = UDim2.new(1, 0, 0, getListHeight())
-			end
-		end)
-
-		local ui = {
-			selected = nil,
-			entries = {},
-		}
-
-		local dropdownOpen = false
-
-		local function setDropdownOpen(state)
-			dropdownOpen = state
-			dropdownList.Visible = state
-			dropdownList.Size = state and UDim2.new(1, 0, 0, getListHeight()) or UDim2.new(1, 0, 0, 0)
-			dropdownArrow.Rotation = state and 180 or 0
-		end
-
-		local function setSelected(entry)
-			ui.selected = entry
-			if entry and entry.name then
-				dropdownButton.Text = tostring(entry.name)
-			else
-				dropdownButton.Text = "Select a game"
-			end
-			setDropdownOpen(false)
-		end
-
-		local function setEntries(entries)
-			ui.entries = entries or {}
-			for _, child in ipairs(dropdownList:GetChildren()) do
-				if child:IsA("TextButton") then
-					child:Destroy()
-				end
-			end
-
-			for index, entry in ipairs(ui.entries) do
-				local option = Instance.new("TextButton")
-				option.Name = tostring(entry.name or ("Game " .. index))
-				option.AutoButtonColor = false
-				if entry.placeId then
-					option.Text = tostring(entry.name or ("Game " .. index))
-				else
-					option.Text = tostring(entry.name or ("Game " .. index)) .. " (info)"
-				end
-				option.Font = fontBody
-				option.TextSize = 13
-				option.TextColor3 = entry.placeId and Color3.fromRGB(220, 220, 220) or Color3.fromRGB(160, 160, 170)
-				option.TextXAlignment = Enum.TextXAlignment.Left
-				option.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
-				option.Size = UDim2.new(1, -6, 0, 22)
-				option.LayoutOrder = index
-				option.Parent = dropdownList
-
-				local optionCorner = Instance.new("UICorner")
-				optionCorner.CornerRadius = UDim.new(0, 4)
-				optionCorner.Parent = option
-
-				option.MouseButton1Click:Connect(function()
-					setSelected(entry)
-					setDropdownOpen(false)
-				end)
-			end
-		end
-
-		dropdownButton.MouseButton1Click:Connect(function()
-			setDropdownOpen(not dropdownOpen)
-		end)
-
-		local function teleportToPlace(placeId)
-			local okTeleport, teleportErr = pcall(function()
-				TeleportService:Teleport(placeId, Players.LocalPlayer)
-			end)
-			if not okTeleport then
-				notify("Game Teleport", "Teleport failed: " .. tostring(teleportErr), "error")
-				pendingTeleport = nil
-				return false
-			end
-			return true
-		end
-
-		teleportButton.MouseButton1Click:Connect(function()
-			local entry = ui.selected
-			if not entry then
-				notify("Game Teleport", "Select a game first.", "warning")
-				return
-			end
-			if not entry.placeId then
-				notify("Game Teleport", "No placeId available for this game.", "warning")
-				return
-			end
-
-			local ok, err = queueHubAutoExecute()
-			if not ok then
-				notify("Game Teleport", "Auto-exec failed: " .. tostring(err), "warning")
-				return
-			end
-
-			pendingTeleport = {
-				entry = entry,
-				placeId = entry.placeId,
-				attemptedRoot = false,
-			}
-			ensureTeleportFailHandler(teleportToPlace)
-			teleportToPlace(entry.placeId)
-		end)
-
-		return {
-			setEntries = setEntries,
-			setSelected = setSelected,
-			getSelected = function()
-				return ui.selected
-			end,
-		}
 	end
 
 	if dashboard then
@@ -1507,11 +1094,11 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		end
 	end
 
-	local teleportCard = dashboard and dashboard:FindFirstChild("Server")
+	local environmentCard = dashboard and dashboard:FindFirstChild("Server")
 	local feedbackCard = dashboard and dashboard:FindFirstChild("Friends")
 
-	if teleportCard then
-		teleportCard.LayoutOrder = 1
+	if environmentCard then
+		environmentCard.LayoutOrder = 1
 	end
 	if feedbackCard then
 		feedbackCard.LayoutOrder = 2
@@ -1524,215 +1111,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 	end
 
 	local feedbackUi = buildFeedbackCard(feedbackCard)
-	local teleportUi = buildTeleportCard(teleportCard)
-
-	local function buildEntriesFromManager(manager)
-		local entries = {}
-		local seen = {}
-
-		local function addEntry(entry)
-			if type(entry) ~= "table" then
-				return
-			end
-			if not entry.placeId or not entry.name then
-				return
-			end
-			local key = tostring(entry.placeId)
-			if seen[key] then
-				return
-			end
-			seen[key] = true
-			table.insert(entries, {
-				name = entry.name,
-				placeId = entry.placeId,
-				universeId = entry.universeId,
-			})
-		end
-
-		if type(manager) == "table" then
-			if type(manager.entries) == "table" then
-				for _, entry in ipairs(manager.entries) do
-					addEntry(entry)
-				end
-			elseif type(manager.byPlace) == "table" then
-				for _, entry in pairs(manager.byPlace) do
-					addEntry(entry)
-				end
-			end
-		end
-
-		table.sort(entries, function(a, b)
-			return tostring(a.name) < tostring(b.name)
-		end)
-
-		return entries
-	end
-
-	local function normalizeBackendEntries(rawGames)
-		local entries = {}
-		if type(rawGames) ~= "table" then
-			return entries
-		end
-
-		for index, entry in ipairs(rawGames) do
-			if type(entry) == "table" then
-				if entry.is_active == nil or entry.is_active == true then
-					local name = entry.name or entry.Name or entry.title or entry.Title or ("Game " .. tostring(index))
-					local placeId = tonumber(entry.place_id or entry.placeId or entry.placeid)
-					local universeId = tonumber(entry.universe_id or entry.universeId or entry.universeid)
-					table.insert(entries, {
-						name = tostring(name),
-						placeId = placeId,
-						universeId = universeId,
-					})
-				end
-			end
-		end
-
-		table.sort(entries, function(a, b)
-			return tostring(a.name) < tostring(b.name)
-		end)
-
-		return entries
-	end
-
-	local function buildSupabaseGamesPath()
-		local endpoint = SupabaseConfig.gamesEndpoint or "/rest/v1/games"
-		local query = SupabaseConfig.gamesQuery or ""
-		local path = endpoint
-		if query ~= "" then
-			if query:sub(1, 1) ~= "?" then
-				path = path .. "?" .. query
-			else
-				path = path .. query
-			end
-		end
-		return path
-	end
-
-	local function fetchSupabaseEntries()
-		if not isSupabaseConfigured() then
-			return nil, "Backend not configured"
-		end
-
-		local path = buildSupabaseGamesPath()
-		local response, err = supabaseRequest(path, "GET", nil, {
-			Prefer = "return=representation",
-		})
-
-		if not response then
-			return nil, err or "Supabase request failed"
-		end
-
-		local data = decodeJson(response.Body)
-		if type(data) ~= "table" then
-			return nil, "Invalid backend response"
-		end
-
-		return normalizeBackendEntries(data)
-	end
-
-	local function loadGameEntries()
-		if type(HomeTabSettings.GameEntries) == "table" then
-			local entries = {}
-			for _, entry in ipairs(HomeTabSettings.GameEntries) do
-				if type(entry) == "table" and entry.name then
-					table.insert(entries, {
-						name = entry.name,
-						placeId = entry.placeId,
-						universeId = entry.universeId,
-					})
-				end
-			end
-			return entries
-		end
-
-		local backendEntries, backendErr = fetchSupabaseEntries()
-		if type(backendEntries) ~= "table" then
-			backendEntries = {}
-			if backendErr then
-				warn("[HomeTab] Supabase games fetch failed:", backendErr)
-			end
-		end
-
-		local managerEntries = {}
-		local missingTeleport = true
-		for _, entry in ipairs(backendEntries) do
-			if entry.placeId then
-				missingTeleport = false
-				break
-			end
-		end
-
-		local url = HomeTabSettings.GameManagerUrl
-		if (#backendEntries == 0 or missingTeleport) and type(url) == "string" and url ~= "" then
-			local ok, body = pcall(function()
-				return game:HttpGet(url)
-			end)
-			if ok and type(body) == "string" then
-				local chunk, err = loadstring(body)
-				if not chunk then
-					warn("[HomeTab] Game manager load failed:", err)
-				else
-					local okRun, manager = pcall(chunk)
-					if not okRun then
-						warn("[HomeTab] Game manager exec failed:", manager)
-					else
-						managerEntries = buildEntriesFromManager(manager)
-					end
-				end
-			end
-		end
-
-		if #backendEntries > 0 and #managerEntries > 0 then
-			local managerByName = {}
-			for _, entry in ipairs(managerEntries) do
-				managerByName[string.lower(tostring(entry.name))] = entry
-			end
-			for _, entry in ipairs(backendEntries) do
-				if not entry.placeId then
-					local match = managerByName[string.lower(tostring(entry.name))]
-					if match then
-						entry.placeId = match.placeId
-						entry.universeId = entry.universeId or match.universeId
-					end
-				end
-			end
-		end
-
-		if #backendEntries == 0 then
-			return managerEntries
-		end
-
-		return backendEntries
-	end
-
-	local function selectDefaultEntry(entries)
-		for _, entry in ipairs(entries) do
-			if entry.placeId == game.PlaceId then
-				return entry
-			end
-		end
-		for _, entry in ipairs(entries) do
-			if entry.placeId then
-				return entry
-			end
-		end
-		return entries[1]
-	end
-
-	if teleportUi then
-		task.spawn(function()
-			local entries = loadGameEntries()
-			if #entries == 0 then
-				entries = {
-					{name = "Current Game", placeId = game.PlaceId},
-				}
-			end
-			teleportUi.setEntries(entries)
-			teleportUi.setSelected(selectDefaultEntry(entries))
-		end)
-	end
+	buildEnvironmentCard(environmentCard)
 
 	if feedbackUi then
 		feedbackUi.updateStatus()
