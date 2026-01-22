@@ -3,6 +3,8 @@
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
+local RunService = game:GetService("RunService")
+local Stats = game:GetService("Stats")
 
 
 return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween, Release, isStudio)
@@ -419,6 +421,285 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			return decoded
 		end
 		return nil
+	end
+
+	local networkStatsContainer = nil
+	local performanceStatsContainer = nil
+	local fpsAccumulator = {
+		frames = 0,
+		delta = 0,
+		sum = 0,
+		current = 0,
+		conn = nil,
+	}
+
+	local NETWORK_STAT_ALIASES = {
+		upload = {
+			"Data Send Kbps",
+			"Data Send Rate",
+			"Data Send",
+			"Network Sent",
+			"Network Sent KBps",
+			"Total Upload",
+		},
+		download = {
+			"Data Receive Kbps",
+			"Data Receive Rate",
+			"Data Receive",
+			"Network Received",
+			"Network Received KBps",
+			"Total Download",
+		},
+	}
+
+	local function ensureFpsSampler()
+		if fpsAccumulator.conn then
+			return
+		end
+		fpsAccumulator.conn = RunService.RenderStepped:Connect(function(dt)
+			fpsAccumulator.frames = fpsAccumulator.frames + 1
+			fpsAccumulator.delta = fpsAccumulator.delta + dt
+			if dt > 0 then
+				fpsAccumulator.sum = fpsAccumulator.sum + (1 / dt)
+			end
+		end)
+	end
+
+	local function resolveNetworkStats()
+		if networkStatsContainer and networkStatsContainer.Parent then
+			return
+		end
+		if networkStatsContainer ~= nil then
+			return
+		end
+		local ok, net = pcall(function()
+			if not Stats then
+				return nil
+			end
+			local network = Stats.Network
+			if not network then
+				return nil
+			end
+			if network.ServerStatsItem ~= nil then
+				return network.ServerStatsItem
+			end
+			if typeof(network.FindFirstChild) == "function" then
+				return network:FindFirstChild("ServerStatsItem")
+			end
+			return nil
+		end)
+		if ok and net then
+			networkStatsContainer = net
+		end
+	end
+
+	local function resolvePerformanceStats()
+		if performanceStatsContainer ~= nil then
+			return
+		end
+		local ok, perf = pcall(function()
+			return Stats and Stats.PerformanceStats
+		end)
+		if ok and perf then
+			performanceStatsContainer = perf
+		end
+	end
+
+	local function extractNumeric(value)
+		if typeof(value) == "string" and value ~= "" then
+			local number = tonumber((value:gsub("[^%d%.%-]", "")))
+			return number or value
+		end
+		return value
+	end
+
+	local function getServerStatValue(statName)
+		resolveNetworkStats()
+		if not networkStatsContainer then
+			return nil
+		end
+
+		local item = nil
+		local okIndex, indexResult = pcall(function()
+			return networkStatsContainer[statName]
+		end)
+		if okIndex and indexResult then
+			item = indexResult
+		end
+
+		if not item and typeof(networkStatsContainer.FindFirstChild) == "function" then
+			local okFind, findResult = pcall(function()
+				return networkStatsContainer:FindFirstChild(statName)
+			end)
+			if okFind and findResult then
+				item = findResult
+			end
+		end
+
+		if not item and typeof(networkStatsContainer.GetChildren) == "function" then
+			local normalizedTarget = string.lower((statName or ""):gsub("[%s_/]+", ""))
+			for _, child in ipairs(networkStatsContainer:GetChildren()) do
+				local normalizedName = string.lower(child.Name:gsub("[%s_/]+", ""))
+				if normalizedName == normalizedTarget then
+					item = child
+					break
+				end
+			end
+		end
+
+		if not item then
+			return nil
+		end
+
+		if typeof(item.GetValue) == "function" then
+			local okValue, value = pcall(item.GetValue, item)
+			if okValue and typeof(value) == "number" then
+				return value
+			end
+		end
+
+		if typeof(item.GetValueString) == "function" then
+			local okString, str = pcall(item.GetValueString, item)
+			if okString and typeof(str) == "string" then
+				return extractNumeric(str)
+			end
+		end
+
+		return nil
+	end
+
+	local function getPerformanceStatValue(statName)
+		resolvePerformanceStats()
+		if not performanceStatsContainer then
+			return nil
+		end
+		local item = nil
+
+		if typeof(performanceStatsContainer.FindFirstChild) == "function" then
+			item = performanceStatsContainer:FindFirstChild(statName)
+		end
+
+		if not item and typeof(performanceStatsContainer.GetChildren) == "function" then
+			local normalizedTarget = string.lower((statName or ""):gsub("[%s_/]+", ""))
+			for _, child in ipairs(performanceStatsContainer:GetChildren()) do
+				local normalizedName = string.lower(child.Name:gsub("[%s_/]+", ""))
+				if normalizedName == normalizedTarget then
+					item = child
+					break
+				end
+			end
+		end
+
+		if not item then
+			return nil
+		end
+
+		if typeof(item.GetValue) == "function" then
+			local okValue, value = pcall(item.GetValue, item)
+			if okValue then
+				if typeof(value) == "number" then
+					return value
+				end
+				return extractNumeric(value)
+			end
+		end
+
+		if typeof(item.GetValueString) == "function" then
+			local okString, str = pcall(item.GetValueString, item)
+			if okString then
+				return extractNumeric(str)
+			end
+		end
+
+		if typeof(item.Value) == "number" then
+			return item.Value
+		end
+
+		return nil
+	end
+
+	local function getPing()
+		local value = getServerStatValue("Data Ping")
+		if typeof(value) == "number" then
+			return string.format("%d ms", math.floor(value + 0.5))
+		end
+		if typeof(value) == "string" and value ~= "" then
+			return value
+		end
+
+		local ok, pingSeconds = pcall(function()
+			return Players.LocalPlayer and Players.LocalPlayer:GetNetworkPing()
+		end)
+		if ok and typeof(pingSeconds) == "number" then
+			local ms = math.max(0, math.floor((pingSeconds * 2) / 0.01))
+			return string.format("%d ms", ms)
+		end
+
+		return "N/A"
+	end
+
+	local function getNetworkStat(aliasList, unit)
+		local value = nil
+		for _, name in ipairs(aliasList) do
+			value = getServerStatValue(name)
+			if value ~= nil then
+				break
+			end
+		end
+
+		if value == nil then
+			for _, name in ipairs(aliasList) do
+				value = getPerformanceStatValue(name)
+				if value ~= nil then
+					break
+				end
+			end
+		end
+
+		if typeof(value) == "number" then
+			return string.format("%.0f %s", value, unit)
+		end
+		if typeof(value) == "string" and value ~= "" then
+			return value
+		end
+		return "N/A"
+	end
+
+	local function getMemory()
+		if Stats and typeof(Stats.GetMemoryUsageMbForTag) == "function" then
+			local ok, total = pcall(function()
+				return Stats:GetMemoryUsageMbForTag(Enum.DeveloperMemoryTag.Total)
+			end)
+			if ok and typeof(total) == "number" then
+				return string.format("%.1f MB", total)
+			end
+		end
+
+		local ok, kb = pcall(function()
+			return collectgarbage("count")
+		end)
+		if ok and kb then
+			return string.format("%.1f MB", kb / 1024)
+		end
+
+		return "N/A"
+	end
+
+	local function getFps()
+		local statFps = getPerformanceStatValue("FrameRate")
+		if typeof(statFps) == "number" and statFps > 0 then
+			fpsAccumulator.current = math.floor(statFps + 0.5)
+		elseif fpsAccumulator.frames > 0 and fpsAccumulator.sum > 0 then
+			fpsAccumulator.current = math.floor((fpsAccumulator.sum / fpsAccumulator.frames) + 0.5)
+		elseif fpsAccumulator.delta > 0 then
+			fpsAccumulator.current = math.floor((fpsAccumulator.frames / fpsAccumulator.delta) + 0.5)
+		else
+			fpsAccumulator.current = 0
+		end
+		fpsAccumulator.frames = 0
+		fpsAccumulator.delta = 0
+		fpsAccumulator.sum = 0
+		return fpsAccumulator.current
 	end
 
 	local rootPlaceCache = {}
@@ -933,41 +1214,52 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		local fontBody = Enum.Font.Gotham
 		local titleColor = (titleLabel and titleLabel.TextColor3) or Color3.fromRGB(240, 240, 240)
 
-		local safeBlock = createBlock(content, 54, Color3.fromRGB(24, 24, 30), Color3.fromRGB(70, 60, 90))
-		safeBlock.Name = "SafeBlock"
-		safeBlock.LayoutOrder = 1
+		local statsBlock = createBlock(content, 110, Color3.fromRGB(24, 24, 30), Color3.fromRGB(70, 60, 90))
+		statsBlock.Name = "EnvironmentStats"
+		statsBlock.LayoutOrder = 1
 
-		local safeAccent = Instance.new("Frame")
-		safeAccent.BackgroundColor3 = Color3.fromRGB(170, 85, 150)
-		safeAccent.Size = UDim2.new(0, 3, 0, 28)
-		safeAccent.Position = UDim2.new(0, 0, 0.5, -14)
-		safeAccent.Parent = safeBlock
+		local statsTitle = Instance.new("TextLabel")
+		statsTitle.Name = "StatsTitle"
+		statsTitle.BackgroundTransparency = 1
+		statsTitle.TextXAlignment = Enum.TextXAlignment.Left
+		statsTitle.Font = fontStrong
+		statsTitle.TextSize = 13
+		statsTitle.TextColor3 = titleColor
+		statsTitle.Text = "Environment Stats"
+		statsTitle.Position = UDim2.new(0, 2, 0, 2)
+		statsTitle.Size = UDim2.new(1, -4, 0, 14)
+		statsTitle.Parent = statsBlock
 
-		local safeTitle = Instance.new("TextLabel")
-		safeTitle.Name = "SafeTitle"
-		safeTitle.BackgroundTransparency = 1
-		safeTitle.TextXAlignment = Enum.TextXAlignment.Left
-		safeTitle.Font = fontStrong
-		safeTitle.TextSize = 14
-		safeTitle.TextColor3 = titleColor
-		safeTitle.Text = "Safe Teleport"
-		safeTitle.Position = UDim2.new(0, 10, 0, 2)
-		safeTitle.Size = UDim2.new(1, -10, 0, 14)
-		safeTitle.Parent = safeBlock
+		local statsText = Instance.new("TextLabel")
+		statsText.Name = "StatsBody"
+		statsText.BackgroundTransparency = 1
+		statsText.TextXAlignment = Enum.TextXAlignment.Left
+		statsText.TextYAlignment = Enum.TextYAlignment.Top
+		statsText.TextWrapped = true
+		statsText.Font = fontBody
+		statsText.TextSize = 12
+		statsText.TextColor3 = Color3.fromRGB(180, 180, 180)
+		statsText.Position = UDim2.new(0, 2, 0, 18)
+		statsText.Size = UDim2.new(1, -4, 1, -20)
+		statsText.Text = "Collecting stats..."
+		statsText.Parent = statsBlock
 
-		local safeDesc = Instance.new("TextLabel")
-		safeDesc.Name = "SafeDesc"
-		safeDesc.BackgroundTransparency = 1
-		safeDesc.TextWrapped = true
-		safeDesc.TextYAlignment = Enum.TextYAlignment.Top
-		safeDesc.TextXAlignment = Enum.TextXAlignment.Left
-		safeDesc.Font = fontBody
-		safeDesc.TextSize = 12
-		safeDesc.TextColor3 = Color3.fromRGB(170, 170, 170)
-		safeDesc.Text = "Teleporting here keeps the script active. Some games kick if you execute after loading."
-		safeDesc.Position = UDim2.new(0, 10, 0, 20)
-		safeDesc.Size = UDim2.new(1, -10, 0, 32)
-		safeDesc.Parent = safeBlock
+		ensureFpsSampler()
+		task.spawn(function()
+			while statsText and statsText.Parent do
+				task.wait(1)
+				local fpsValue = getFps()
+				local text = table.concat({
+					string.format("FPS: %s", fpsValue > 0 and tostring(fpsValue) or "N/A"),
+					string.format("Ping: %s", getPing()),
+					string.format("Upload: %s", getNetworkStat(NETWORK_STAT_ALIASES.upload, "KB/s")),
+					string.format("Download: %s", getNetworkStat(NETWORK_STAT_ALIASES.download, "KB/s")),
+					string.format("Memory: %s", getMemory()),
+					string.format("Executor: %s", typeof(identifyexecutor) == "function" and identifyexecutor() or "Unknown"),
+				}, "\n")
+				statsText.Text = text
+			end
+		end)
 
 		local teleportButton = Instance.new("TextButton")
 		teleportButton.Name = "TeleportButton"
