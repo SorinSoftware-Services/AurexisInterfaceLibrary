@@ -749,8 +749,11 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		if content:IsA("ScrollingFrame") then
 			content.Active = allowScroll == true
 			content.ScrollingEnabled = allowScroll ~= false
-			content.ScrollBarThickness = allowScroll and 3 or 0
-			content.ScrollBarImageTransparency = allowScroll and 0.7 or 1
+			content.ScrollBarThickness = allowScroll and 2 or 0
+			content.ScrollBarImageTransparency = allowScroll and 0.75 or 1
+			if allowScroll then
+				content.ScrollBarInset = Enum.ScrollBarInset.None
+			end
 			content.ScrollingDirection = Enum.ScrollingDirection.Y
 			content.CanvasSize = UDim2.new(0, 0, 0, 0)
 		end
@@ -1036,7 +1039,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			titleLabel.Text = "Environment Stats"
 		end
 
-		local content = createContentFrame(card, "EnvironmentContent", true)
+		local content = createContentFrame(card, "EnvironmentContent", false)
 		local contentPadding = content:FindFirstChildOfClass("UIPadding")
 		if contentPadding then
 			contentPadding.PaddingTop = UDim.new(0, 4)
@@ -1046,10 +1049,10 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		local fontBody = Enum.Font.Gotham
 		local titleColor = (titleLabel and titleLabel.TextColor3) or Color3.fromRGB(240, 240, 240)
 
-		local statsBlock = createBlock(content, 124, Color3.fromRGB(24, 24, 30), Color3.fromRGB(70, 60, 90))
+		local statsBlock = createBlock(content, 118, Color3.fromRGB(24, 24, 30), Color3.fromRGB(70, 60, 90))
 		statsBlock.Name = "EnvironmentStats"
 		statsBlock.LayoutOrder = 1
-		statsBlock.BackgroundTransparency = 0.2
+		statsBlock.BackgroundTransparency = 0.5
 
 		local statsTitle = Instance.new("TextLabel")
 		statsTitle.Name = "StatsTitle"
