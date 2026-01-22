@@ -1875,10 +1875,21 @@ function Aurexis:CreateWindow(WindowSettings)
 local HomeTabModule = requireRemote("src/components/home-tab.lua")
 local attachSectionControls = requireRemote("src/components/section-controls.lua")
 local attachTabControls = requireRemote("src/components/tab-controls.lua")
-HomeTabModule(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween, Release, isStudio)
+local homeTabOk, homeTabErr = pcall(function()
+	if type(HomeTabModule) == "function" then
+		HomeTabModule(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween, Release, isStudio)
+	end
+end)
+if not homeTabOk then
+	warn("[Aurexis] HomeTab module failed to load:", homeTabErr)
+end
 
 -- HomeTab jetzt ERSTELLEN (sonst bleibt alles leer)
-Window:CreateHomeTab()
+if type(Window.CreateHomeTab) == "function" then
+	Window:CreateHomeTab()
+else
+	warn("[Aurexis] CreateHomeTab missing - Home tab skipped.")
+end
 
 FirstTab = false
 
