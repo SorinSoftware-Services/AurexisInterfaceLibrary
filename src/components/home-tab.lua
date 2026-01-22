@@ -716,10 +716,13 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 	end
 
 	local function createContentFrame(card, name, allowScroll)
+		local desiredClass = allowScroll and "ScrollingFrame" or "Frame"
 		local content
 		for _, child in ipairs(card:GetChildren()) do
 			if child.Name == name and (child:IsA("Frame") or child:IsA("ScrollingFrame")) then
-				if not content then
+				if child.ClassName ~= desiredClass then
+					child:Destroy()
+				elseif not content then
 					content = child
 				else
 					child:Destroy()
@@ -727,11 +730,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			end
 		end
 		if not content then
-			if allowScroll then
-				content = Instance.new("ScrollingFrame")
-			else
-				content = Instance.new("Frame")
-			end
+			content = Instance.new(desiredClass)
 		end
 
 		content.Name = name
@@ -749,18 +748,15 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		if content:IsA("ScrollingFrame") then
 			content.Active = allowScroll == true
 			content.ScrollingEnabled = allowScroll ~= false
-			content.ScrollBarThickness = allowScroll and 2 or 0
-			content.ScrollBarImageTransparency = allowScroll and 0.75 or 1
-			if allowScroll then
-				content.ScrollBarInset = Enum.ScrollBarInset.None
-			end
+			content.ScrollBarThickness = allowScroll and 1 or 0
+			content.ScrollBarImageTransparency = allowScroll and 0.85 or 1
 			content.ScrollingDirection = Enum.ScrollingDirection.Y
 			content.CanvasSize = UDim2.new(0, 0, 0, 0)
 		end
 
 		local padding = Instance.new("UIPadding")
 		padding.PaddingLeft = UDim.new(0, 6)
-		padding.PaddingRight = UDim.new(0, 6)
+		padding.PaddingRight = allowScroll and UDim.new(0, 8) or UDim.new(0, 6)
 		padding.PaddingTop = UDim.new(0, 6)
 		padding.PaddingBottom = UDim.new(0, 6)
 		padding.Parent = content
@@ -1049,10 +1045,10 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		local fontBody = Enum.Font.Gotham
 		local titleColor = (titleLabel and titleLabel.TextColor3) or Color3.fromRGB(240, 240, 240)
 
-		local statsBlock = createBlock(content, 118, Color3.fromRGB(24, 24, 30), Color3.fromRGB(70, 60, 90))
+		local statsBlock = createBlock(content, 114, Color3.fromRGB(24, 24, 30), Color3.fromRGB(70, 60, 90))
 		statsBlock.Name = "EnvironmentStats"
 		statsBlock.LayoutOrder = 1
-		statsBlock.BackgroundTransparency = 0.5
+		statsBlock.BackgroundTransparency = 0.65
 
 		local statsTitle = Instance.new("TextLabel")
 		statsTitle.Name = "StatsTitle"
