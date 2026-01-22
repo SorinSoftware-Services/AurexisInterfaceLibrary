@@ -421,10 +421,159 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		return nil
 	end
 
+	local rootPlaceCache = {}
+	local pendingTeleport = nil
+	local teleportFailConn = nil
+
+	local TeleportErrorMessages = {
+		[Enum.TeleportResult.GameNotFound] = "Game not found or not public.",
+		[Enum.TeleportResult.GameEnded] = "This game session ended.",
+		[Enum.TeleportResult.GameFull] = "Server full. Try again.",
+		[Enum.TeleportResult.Unauthorized] = "Teleport restricted (773).",
+		[Enum.TeleportResult.NotAllowed] = "Teleport not allowed for this place.",
+		[Enum.TeleportResult.TeleportDisabled] = "Teleport disabled for this place.",
+		[Enum.TeleportResult.Failure] = "Teleport failed. Try again later.",
+	}
+
+	local function fetchRootPlaceId(universeId)
+		if not universeId then
+			return nil, "Missing universeId"
+		end
+
+		local response, err = httpRequest({
+			Url = "https://games.roblox.com/v1/games?universeIds=" .. tostring(universeId),
+			Method = "GET",
+			Headers = {Accept = "application/json"},
+		})
+
+		if not response then
+			return nil, err or "Request failed"
+		end
+
+		local data = decodeJson(response.Body)
+		local record = type(data) == "table" and type(data.data) == "table" and data.data[1] or nil
+		local rootPlaceId = record and record.rootPlaceId or nil
+
+		if not rootPlaceId then
+			return nil, "rootPlaceId missing"
+		end
+
+		return tonumber(rootPlaceId)
+	end
+
+	local function getRootPlaceId(universeId)
+		if not universeId then
+			return nil, "Missing universeId"
+		end
+		if rootPlaceCache[universeId] then
+			return rootPlaceCache[universeId]
+		end
+		local rootId, err = fetchRootPlaceId(universeId)
+		if rootId then
+			rootPlaceCache[universeId] = rootId
+			return rootId
+		end
+		return nil, err
+	end
+
+	local function formatTeleportFailure(result, message)
+		local text = TeleportErrorMessages[result]
+		if not text or text == "" then
+			text = "Teleport failed."
+		end
+		if message and message ~= "" then
+			text = text .. " (" .. tostring(message) .. ")"
+		end
+		return text
+	end
+
+	local function isUnauthorizedTeleport(result, message)
+		if result == Enum.TeleportResult.Unauthorized then
+			return true
+		end
+		if type(message) ~= "string" then
+			return false
+		end
+		local lower = string.lower(message)
+		return lower:find("unauthorized", 1, true) ~= nil
+			or lower:find("different creator", 1, true) ~= nil
+			or lower:find("teleport from this universe", 1, true) ~= nil
+	end
+
+	local function offerManualJoin(entry, fallbackPlaceId)
+		local placeId = fallbackPlaceId
+		if entry and entry.universeId then
+			local rootId = getRootPlaceId(entry.universeId)
+			if rootId then
+				placeId = rootId
+			end
+		end
+		if not placeId then
+			return
+		end
+		local link = "roblox://placeId=" .. tostring(placeId)
+		if typeof(setclipboard) == "function" then
+			pcall(setclipboard, link)
+			notify("Game Teleport", "Teleport blocked. Join link copied to clipboard.", "warning")
+		else
+			notify("Game Teleport", "Teleport blocked. Join via: " .. link, "warning")
+		end
+	end
+
+	local function ensureTeleportFailHandler(teleportFunc)
+		if teleportFailConn then
+			return
+		end
+		teleportFailConn = TeleportService.TeleportInitFailed:Connect(function(player, result, message, placeId, gameId)
+			if player ~= Players.LocalPlayer then
+				return
+			end
+			if not pendingTeleport then
+				return
+			end
+
+			local entry = pendingTeleport.entry
+			local lastPlaceId = pendingTeleport.placeId
+
+			if isUnauthorizedTeleport(result, message) then
+				offerManualJoin(entry, lastPlaceId)
+				pendingTeleport = nil
+				return
+			end
+
+			if pendingTeleport.attemptedRoot then
+				notify("Game Teleport", formatTeleportFailure(result, message), "error")
+				pendingTeleport = nil
+				return
+			end
+
+			if entry and entry.universeId then
+				local rootId = getRootPlaceId(entry.universeId)
+				if rootId and rootId ~= lastPlaceId then
+					pendingTeleport.attemptedRoot = true
+					pendingTeleport.placeId = rootId
+					notify("Game Teleport", "Place restricted. Trying public entry...", "warning")
+					teleportFunc(rootId)
+					return
+				end
+			end
+
+			notify("Game Teleport", formatTeleportFailure(result, message), "error")
+			pendingTeleport = nil
+		end)
+	end
+
 	local function resolveQueueOnTeleport()
 		return (syn and syn.queue_on_teleport)
 			or queue_on_teleport
 			or (fluxus and fluxus.queue_on_teleport)
+	end
+
+	local function resolveAutoExecScript()
+		if type(HomeTabSettings.AutoExecScript) == "string" and HomeTabSettings.AutoExecScript ~= "" then
+			return HomeTabSettings.AutoExecScript
+		end
+		return 'loadstring(game:HttpGet("https://scripts.sorinservice.online/sorin/script_hub.lua"))()'
 	end
 
 	local function queueHubAutoExecute()
@@ -432,10 +581,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		if typeof(q) ~= "function" then
 			return false, "queue_on_teleport is not available in this executor"
 		end
-		local scriptSource = HomeTabSettings.AutoExecScript
-		if type(scriptSource) ~= "string" or scriptSource == "" then
-			return false, "auto-exec script not configured"
-		end
+		local scriptSource = resolveAutoExecScript()
 		local ok, err = pcall(q, scriptSource)
 		if not ok then
 			return false, tostring(err)
@@ -1015,6 +1161,18 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			setDropdownOpen(not dropdownOpen)
 		end)
 
+		local function teleportToPlace(placeId)
+			local okTeleport, teleportErr = pcall(function()
+				TeleportService:Teleport(placeId, Players.LocalPlayer)
+			end)
+			if not okTeleport then
+				notify("Game Teleport", "Teleport failed: " .. tostring(teleportErr), "error")
+				pendingTeleport = nil
+				return false
+			end
+			return true
+		end
+
 		teleportButton.MouseButton1Click:Connect(function()
 			local entry = ui.selected
 			if not entry then
@@ -1022,7 +1180,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 				return
 			end
 			if not entry.placeId then
-				notify("Game Teleport", "No teleport data for this game yet.", "warning")
+				notify("Game Teleport", "No placeId available for this game.", "warning")
 				return
 			end
 
@@ -1032,12 +1190,13 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 				return
 			end
 
-			local okTeleport, teleportErr = pcall(function()
-				TeleportService:Teleport(entry.placeId, Players.LocalPlayer)
-			end)
-			if not okTeleport then
-				notify("Game Teleport", "Teleport failed: " .. tostring(teleportErr), "error")
-			end
+			pendingTeleport = {
+				entry = entry,
+				placeId = entry.placeId,
+				attemptedRoot = false,
+			}
+			ensureTeleportFailHandler(teleportToPlace)
+			teleportToPlace(entry.placeId)
 		end)
 
 		return {
