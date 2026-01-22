@@ -749,7 +749,8 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		if content:IsA("ScrollingFrame") then
 			content.Active = allowScroll == true
 			content.ScrollingEnabled = allowScroll ~= false
-			content.ScrollBarThickness = allowScroll and 4 or 0
+			content.ScrollBarThickness = allowScroll and 3 or 0
+			content.ScrollBarImageTransparency = allowScroll and 0.7 or 1
 			content.ScrollingDirection = Enum.ScrollingDirection.Y
 			content.CanvasSize = UDim2.new(0, 0, 0, 0)
 		end
@@ -766,9 +767,10 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		layout.Padding = UDim.new(0, 6)
 		layout.Parent = content
 
+		local extraCanvas = allowScroll and 12 or 0
 		if content:IsA("ScrollingFrame") then
 			layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-				content.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 2)
+				content.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + extraCanvas)
 			end)
 		end
 
@@ -1035,13 +1037,19 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		end
 
 		local content = createContentFrame(card, "EnvironmentContent", true)
+		local contentPadding = content:FindFirstChildOfClass("UIPadding")
+		if contentPadding then
+			contentPadding.PaddingTop = UDim.new(0, 4)
+			contentPadding.PaddingBottom = UDim.new(0, 4)
+		end
 		local fontStrong = Enum.Font.GothamSemibold
 		local fontBody = Enum.Font.Gotham
 		local titleColor = (titleLabel and titleLabel.TextColor3) or Color3.fromRGB(240, 240, 240)
 
-		local statsBlock = createBlock(content, 110, Color3.fromRGB(24, 24, 30), Color3.fromRGB(70, 60, 90))
+		local statsBlock = createBlock(content, 124, Color3.fromRGB(24, 24, 30), Color3.fromRGB(70, 60, 90))
 		statsBlock.Name = "EnvironmentStats"
 		statsBlock.LayoutOrder = 1
+		statsBlock.BackgroundTransparency = 0.2
 
 		local statsTitle = Instance.new("TextLabel")
 		statsTitle.Name = "StatsTitle"
