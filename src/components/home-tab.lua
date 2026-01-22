@@ -16,7 +16,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		DetectedExecutors = {"Swift", "Valex", "Nucleus", "Codex"},
 		DiscordInvite = "XC5hpQQvMX", -- Only the invite code, not the full URL.
 		GameManagerUrl = "https://scripts.sorinservice.online/sorin/game-manager",
-		AutoExecScript = "loadstring(game:HttpGet('https://scripts.sorinservice.online/sorin/script_hub.lua'))()",
+		AutoExecScript = 'loadstring(game:HttpGet("https://scripts.sorinservice.online/sorin/script_hub.lua"))()',
 		Supabase = {
 			url = "https://udnvaneupscmrgwutamv.supabase.co",
 			anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkbnZhbmV1cHNjbXJnd3V0YW12Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ1NjEyMzAsImV4cCI6MjA3MDEzNzIzMH0.7duKofEtgRarIYDAoMfN7OEkOI_zgkG2WzAXZlxl5J0",
@@ -495,6 +495,8 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		end
 
 		if content:IsA("ScrollingFrame") then
+			content.Active = allowScroll == true
+			content.ScrollingEnabled = allowScroll ~= false
 			content.ScrollBarThickness = allowScroll and 4 or 0
 			content.ScrollingDirection = Enum.ScrollingDirection.Y
 			content.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -546,26 +548,26 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		return frame
 	end
 
-	local function createLabeledInput(parent, font, labelText, placeholder, maxChars)
+	local function createLabeledInput(parent, labelFont, inputFont, labelText, placeholder, maxChars)
 		local wrapper = Instance.new("Frame")
 		wrapper.BackgroundTransparency = 1
-		wrapper.Size = UDim2.new(1, 0, 0, 38)
+		wrapper.Size = UDim2.new(1, 0, 0, 42)
 		wrapper.Parent = parent
 
 		local label = Instance.new("TextLabel")
 		label.BackgroundTransparency = 1
 		label.TextXAlignment = Enum.TextXAlignment.Left
-		label.Font = font
+		label.Font = labelFont or Enum.Font.GothamSemibold
 		label.TextSize = 12
 		label.TextColor3 = Color3.fromRGB(200, 200, 210)
 		label.Text = labelText or ""
-		label.Size = UDim2.new(1, 0, 0, 12)
+		label.Size = UDim2.new(1, 0, 0, 14)
 		label.Parent = wrapper
 
 		local frame = Instance.new("Frame")
 		frame.BackgroundColor3 = Color3.fromRGB(32, 30, 38)
-		frame.Size = UDim2.new(1, 0, 0, 22)
-		frame.Position = UDim2.new(0, 0, 0, 14)
+		frame.Size = UDim2.new(1, 0, 0, 24)
+		frame.Position = UDim2.new(0, 0, 0, 16)
 		frame.Parent = wrapper
 
 		local corner = Instance.new("UICorner")
@@ -586,8 +588,8 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		box.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
 		box.TextColor3 = Color3.fromRGB(235, 235, 235)
 		box.TextXAlignment = Enum.TextXAlignment.Left
-		box.Font = font
-		box.TextSize = 13
+		box.Font = inputFont or Enum.Font.Gotham
+		box.TextSize = 14
 		box.Size = UDim2.new(1, -12, 1, 0)
 		box.Position = UDim2.new(0, 6, 0, 0)
 		box.Parent = frame
@@ -616,10 +618,11 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			titleLabel.Text = "Feedback & Ideas"
 		end
 
-		local content = createContentFrame(card, "FeedbackContent", false)
-		local font = (titleLabel and titleLabel.Font) or Enum.Font.Gotham
+		local content = createContentFrame(card, "FeedbackContent", true)
+		local fontStrong = Enum.Font.GothamSemibold
+		local fontBody = Enum.Font.Gotham
 
-		local statusBlock = createBlock(content, 26, Color3.fromRGB(24, 24, 30), Color3.fromRGB(64, 61, 76))
+		local statusBlock = createBlock(content, 28, Color3.fromRGB(24, 24, 30), Color3.fromRGB(64, 61, 76))
 		statusBlock.Name = "StatusBlock"
 		statusBlock.LayoutOrder = 1
 
@@ -639,8 +642,8 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		statusLabel.Name = "Status"
 		statusLabel.BackgroundTransparency = 1
 		statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-		statusLabel.Font = font
-		statusLabel.TextSize = 12
+		statusLabel.Font = fontStrong
+		statusLabel.TextSize = 13
 		statusLabel.Position = UDim2.new(0, 14, 0, 0)
 		statusLabel.Size = UDim2.new(1, -14, 1, 0)
 		statusLabel.Parent = statusBlock
@@ -663,20 +666,20 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 
 		updateStatus()
 
-		local feedbackBox, feedbackFrame = createLabeledInput(content, font, "Feedback", "What should we improve?", 300)
+		local feedbackBox, feedbackFrame = createLabeledInput(content, fontStrong, fontBody, "Feedback", "What should we improve?", 300)
 		feedbackFrame.LayoutOrder = 2
 
-		local ideaBox, ideaFrame = createLabeledInput(content, font, "Ideas", "Game ideas or feature requests", 200)
+		local ideaBox, ideaFrame = createLabeledInput(content, fontStrong, fontBody, "Ideas", "Game ideas or feature requests", 200)
 		ideaFrame.LayoutOrder = 3
 
-		local contactBox, contactFrame = createLabeledInput(content, font, "Contact", "Contact (optional)", 80)
+		local contactBox, contactFrame = createLabeledInput(content, fontStrong, fontBody, "Contact", "Contact (optional)", 80)
 		contactFrame.LayoutOrder = 4
 
 		local submitButton = Instance.new("TextButton")
 		submitButton.Name = "SubmitFeedback"
 		submitButton.AutoButtonColor = false
 		submitButton.Text = "Submit feedback"
-		submitButton.Font = font
+		submitButton.Font = fontStrong
 		submitButton.TextSize = 14
 		submitButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 		submitButton.BackgroundColor3 = Color3.fromRGB(86, 110, 190)
@@ -779,11 +782,12 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			titleLabel.Text = "Game Teleport (Auto-Exec)"
 		end
 
-		local content = createContentFrame(card, "TeleportContent", false)
-		local font = (titleLabel and titleLabel.Font) or Enum.Font.Gotham
+		local content = createContentFrame(card, "TeleportContent", true)
+		local fontStrong = Enum.Font.GothamSemibold
+		local fontBody = Enum.Font.Gotham
 		local titleColor = (titleLabel and titleLabel.TextColor3) or Color3.fromRGB(240, 240, 240)
 
-		local safeBlock = createBlock(content, 48, Color3.fromRGB(24, 24, 30), Color3.fromRGB(70, 60, 90))
+		local safeBlock = createBlock(content, 54, Color3.fromRGB(24, 24, 30), Color3.fromRGB(70, 60, 90))
 		safeBlock.Name = "SafeBlock"
 		safeBlock.LayoutOrder = 1
 
@@ -797,8 +801,8 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		safeTitle.Name = "SafeTitle"
 		safeTitle.BackgroundTransparency = 1
 		safeTitle.TextXAlignment = Enum.TextXAlignment.Left
-		safeTitle.Font = font
-		safeTitle.TextSize = 13
+		safeTitle.Font = fontStrong
+		safeTitle.TextSize = 14
 		safeTitle.TextColor3 = titleColor
 		safeTitle.Text = "Safe Teleport"
 		safeTitle.Position = UDim2.new(0, 10, 0, 2)
@@ -811,19 +815,19 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		safeDesc.TextWrapped = true
 		safeDesc.TextYAlignment = Enum.TextYAlignment.Top
 		safeDesc.TextXAlignment = Enum.TextXAlignment.Left
-		safeDesc.Font = font
-		safeDesc.TextSize = 11
+		safeDesc.Font = fontBody
+		safeDesc.TextSize = 12
 		safeDesc.TextColor3 = Color3.fromRGB(170, 170, 170)
 		safeDesc.Text = "Teleporting here keeps the script active. Some games kick if you execute after loading."
-		safeDesc.Position = UDim2.new(0, 10, 0, 18)
-		safeDesc.Size = UDim2.new(1, -10, 0, 26)
+		safeDesc.Position = UDim2.new(0, 10, 0, 20)
+		safeDesc.Size = UDim2.new(1, -10, 0, 32)
 		safeDesc.Parent = safeBlock
 
 		local teleportButton = Instance.new("TextButton")
 		teleportButton.Name = "TeleportButton"
 		teleportButton.AutoButtonColor = false
 		teleportButton.Text = "Teleport & Auto-Execute"
-		teleportButton.Font = font
+		teleportButton.Font = fontStrong
 		teleportButton.TextSize = 14
 		teleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 		teleportButton.BackgroundColor3 = Color3.fromRGB(165, 55, 120)
@@ -852,7 +856,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		selectLabel.Name = "SelectLabel"
 		selectLabel.BackgroundTransparency = 1
 		selectLabel.TextXAlignment = Enum.TextXAlignment.Left
-		selectLabel.Font = font
+		selectLabel.Font = fontStrong
 		selectLabel.TextSize = 12
 		selectLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 		selectLabel.Text = "Select Game"
@@ -864,7 +868,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		dropdownButton.Name = "GameSelect"
 		dropdownButton.AutoButtonColor = false
 		dropdownButton.Text = "Select a game"
-		dropdownButton.Font = font
+		dropdownButton.Font = fontBody
 		dropdownButton.TextSize = 13
 		dropdownButton.TextColor3 = Color3.fromRGB(230, 230, 230)
 		dropdownButton.TextXAlignment = Enum.TextXAlignment.Left
@@ -891,7 +895,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		dropdownArrow.Name = "Arrow"
 		dropdownArrow.BackgroundTransparency = 1
 		dropdownArrow.Text = "v"
-		dropdownArrow.Font = font
+		dropdownArrow.Font = fontStrong
 		dropdownArrow.TextSize = 13
 		dropdownArrow.TextColor3 = Color3.fromRGB(200, 200, 200)
 		dropdownArrow.Size = UDim2.new(0, 12, 1, 0)
@@ -902,6 +906,8 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		dropdownList.Name = "GameList"
 		dropdownList.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
 		dropdownList.BorderSizePixel = 0
+		dropdownList.Active = true
+		dropdownList.ScrollingEnabled = true
 		dropdownList.ScrollBarThickness = 4
 		dropdownList.CanvasSize = UDim2.new(0, 0, 0, 0)
 		dropdownList.Size = UDim2.new(1, 0, 0, 0)
@@ -924,8 +930,24 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		listLayout.Padding = UDim.new(0, 4)
 		listLayout.Parent = dropdownList
 
+		local maxListHeight = 130
+
+		local function getListHeight()
+			local target = listLayout.AbsoluteContentSize.Y + 8
+			if target < 28 then
+				target = 28
+			end
+			if target > maxListHeight then
+				target = maxListHeight
+			end
+			return target
+		end
+
 		listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 			dropdownList.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 4)
+			if dropdownOpen then
+				dropdownList.Size = UDim2.new(1, 0, 0, getListHeight())
+			end
 		end)
 
 		local ui = {
@@ -938,7 +960,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		local function setDropdownOpen(state)
 			dropdownOpen = state
 			dropdownList.Visible = state
-			dropdownList.Size = state and UDim2.new(1, 0, 0, 90) or UDim2.new(1, 0, 0, 0)
+			dropdownList.Size = state and UDim2.new(1, 0, 0, getListHeight()) or UDim2.new(1, 0, 0, 0)
 			dropdownArrow.Rotation = state and 180 or 0
 		end
 
@@ -969,8 +991,8 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 				else
 					option.Text = tostring(entry.name or ("Game " .. index)) .. " (info)"
 				end
-				option.Font = font
-				option.TextSize = 12
+				option.Font = fontBody
+				option.TextSize = 13
 				option.TextColor3 = entry.placeId and Color3.fromRGB(220, 220, 220) or Color3.fromRGB(160, 160, 170)
 				option.TextXAlignment = Enum.TextXAlignment.Left
 				option.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
