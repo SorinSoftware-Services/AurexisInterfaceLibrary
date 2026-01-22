@@ -1048,7 +1048,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		local statsBlock = createBlock(content, 114, Color3.fromRGB(24, 24, 30), Color3.fromRGB(70, 60, 90))
 		statsBlock.Name = "EnvironmentStats"
 		statsBlock.LayoutOrder = 1
-		statsBlock.BackgroundTransparency = 0.65
+		statsBlock.BackgroundTransparency = 0.80
 
 		local statsTitle = Instance.new("TextLabel")
 		statsTitle.Name = "StatsTitle"
