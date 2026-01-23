@@ -34,7 +34,8 @@ by Nebula Softworks
 
 
 
-local BASE_URL = "https://raw.githubusercontent.com/SorinSoftware-Services/AurexisInterfaceLibrary/Developer/"
+local BASE_URL = (getgenv and getgenv().AurexisBaseUrl)
+	or "https://raw.githubusercontent.com/SorinSoftware-Services/AurexisInterfaceLibrary/Developer/"
 
 local Release = "Developerbuild for: Version 1.0.0"
 
