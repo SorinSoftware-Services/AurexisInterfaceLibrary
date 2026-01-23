@@ -1024,11 +1024,11 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			padding.PaddingLeft = UDim.new(0, 0)
 			padding.PaddingRight = UDim.new(0, 10)
 			padding.PaddingTop = UDim.new(0, 0)
-			padding.PaddingBottom = UDim.new(0, 160)
+			padding.PaddingBottom = UDim.new(0, 200)
 			padding.Parent = container
 		else
 			padding.PaddingRight = UDim.new(0, math.max(padding.PaddingRight.Offset, 10))
-			padding.PaddingBottom = UDim.new(0, math.max(padding.PaddingBottom.Offset, 160))
+			padding.PaddingBottom = UDim.new(0, math.max(padding.PaddingBottom.Offset, 200))
 		end
 
 		local layout = container:FindFirstChildWhichIsA("UIListLayout")
