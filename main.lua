@@ -1875,61 +1875,21 @@ function Aurexis:CreateWindow(WindowSettings)
 local HomeTabModule = requireRemote("src/components/home-tab.lua")
 local attachSectionControls = requireRemote("src/components/section-controls.lua")
 local attachTabControls = requireRemote("src/components/tab-controls.lua")
-
-local function tryLoadHomeTabFromUrl(url)
-	local ok, body = pcall(function()
-		return game:HttpGet(url)
-	end)
-	if not ok then
-		return nil, "HttpGet failed: " .. tostring(body)
+local homeTabOk, homeTabErr = pcall(function()
+	if type(HomeTabModule) == "function" then
+		HomeTabModule(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween, Release, isStudio)
 	end
-	local fn, lerr = loadstring(body)
-	if not fn then
-		return nil, "loadstring failed: " .. tostring(lerr)
-	end
-	local ok2, res = pcall(fn)
-	if not ok2 then
-		return nil, "module pcall failed: " .. tostring(res)
-	end
-	return res
+end)
+if not homeTabOk then
+	warn("[Aurexis] HomeTab module failed to load:", homeTabErr)
 end
-
-local function attachHomeTab()
-	local module = HomeTabModule
-	if type(module) ~= "function" then
-		local altUrl = "https://raw.githubusercontent.com/SorinSoftware-Services/AurexisInterfaceLibrary/Developer/src/components/home-tab.lua"
-		local alt, err = tryLoadHomeTabFromUrl(altUrl)
-		if type(alt) == "function" then
-			module = alt
-		else
-			warn("[Aurexis] HomeTab fallback failed:", err)
-		end
-	end
-
-	if type(module) == "function" then
-		local ok, err = pcall(module, Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween, Release, isStudio)
-		if not ok then
-			warn("[Aurexis] HomeTab module failed to load:", err)
-		end
-	end
-end
-
-attachHomeTab()
 
 -- HomeTab jetzt ERSTELLEN (sonst bleibt alles leer)
-local function createHomeTabStub(self, settings)
-	attachHomeTab()
-	if type(self.CreateHomeTab) == "function" and self.CreateHomeTab ~= createHomeTabStub then
-		return self:CreateHomeTab(settings)
-	end
+if type(Window.CreateHomeTab) == "function" then
+	Window:CreateHomeTab()
+else
 	warn("[Aurexis] CreateHomeTab missing - Home tab skipped.")
 end
-
-if type(Window.CreateHomeTab) ~= "function" then
-	Window.CreateHomeTab = createHomeTabStub
-end
-
-Window:CreateHomeTab()
 
 FirstTab = false
 
