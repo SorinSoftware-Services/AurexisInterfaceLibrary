@@ -1557,15 +1557,15 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			while statsText and statsText.Parent do
 				task.wait(1)
 				local fpsValue = getFps()
-				task.wait(0.02)
+				task.wait(0.2)
 				local pingValue = getPing()
-				task.wait(0.02)
+				task.wait(0.2)
 				local uploadValue = getNetworkStat(NETWORK_STAT_ALIASES.upload, "KB/s")
-				task.wait(0.02)
+				task.wait(0.2)
 				local downloadValue = getNetworkStat(NETWORK_STAT_ALIASES.download, "KB/s")
-				task.wait(0.02)
+				task.wait(0.2)
 				local memoryValue = getMemory()
-				task.wait(0.02)
+				task.wait(0.2)
 				local execValue = typeof(identifyexecutor) == "function" and identifyexecutor() or "Unknown"
 				local text = table.concat({
 					string.format("FPS: %s", fpsValue > 0 and tostring(fpsValue) or "N/A"),
