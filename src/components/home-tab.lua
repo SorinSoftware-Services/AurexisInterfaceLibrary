@@ -20,6 +20,11 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			url = "https://udnvaneupscmrgwutamv.supabase.co",
 			anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkbnZhbmV1cHNjbXJnd3V0YW12Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ1NjEyMzAsImV4cCI6MjA3MDEzNzIzMH0.7duKofEtgRarIYDAoMfN7OEkOI_zgkG2WzAXZlxl5J0",
 			feedbackFunction = "submit_feedback",
+			hubInfoTable = "hub_metadata",
+			hubInfoOrderColumn = "updated_at",
+			supportedGamesTable = "games",
+			supportedGamesFilter = "is_active=eq.true",
+			supportedGamesLimit = 1000,
 		},
 	}, HomeTabSettings or {})
 
@@ -206,6 +211,11 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		url = "",
 		anonKey = "",
 		feedbackFunction = "submit_feedback",
+		hubInfoTable = "hub_metadata",
+		hubInfoOrderColumn = "updated_at",
+		supportedGamesTable = "games",
+		supportedGamesFilter = "is_active=eq.true",
+		supportedGamesLimit = 1000,
 	}
 
 	if type(HomeTabSettings.Supabase) == "table" then
@@ -875,6 +885,56 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		return box, wrapper
 	end
 
+	local function createParagraph(parent, title, text)
+		if not (Elements and Elements.Template and Elements.Template.Paragraph) then
+			return nil
+		end
+
+		local paragraph = Elements.Template.Paragraph:Clone()
+		paragraph.Visible = true
+		paragraph.Parent = parent
+
+		if paragraph:FindFirstChild("Title") then
+			paragraph.Title.Text = title or ""
+			paragraph.Title.TextTransparency = 0
+		end
+		if paragraph:FindFirstChild("Text") then
+			paragraph.Text.Text = text or ""
+			paragraph.Text.TextTransparency = 0
+		end
+		paragraph.BackgroundTransparency = 1
+		if paragraph:FindFirstChild("UIStroke") then
+			paragraph.UIStroke.Transparency = 0.5
+		end
+
+		local function update()
+			if paragraph:FindFirstChild("Text") then
+				paragraph.Text.Size = UDim2.new(paragraph.Text.Size.X.Scale, paragraph.Text.Size.X.Offset, 0, math.huge)
+				paragraph.Text.Size = UDim2.new(paragraph.Text.Size.X.Scale, paragraph.Text.Size.X.Offset, 0, paragraph.Text.TextBounds.Y)
+				paragraph.Size = UDim2.new(paragraph.Size.X.Scale, paragraph.Size.X.Offset, 0, paragraph.Text.TextBounds.Y + 40)
+			end
+		end
+
+		update()
+
+		local paragraphApi = {
+			Instance = paragraph,
+		}
+
+		function paragraphApi:Set(settings)
+			settings = settings or {}
+			if settings.Title ~= nil and paragraph:FindFirstChild("Title") then
+				paragraph.Title.Text = settings.Title
+			end
+			if settings.Text ~= nil and paragraph:FindFirstChild("Text") then
+				paragraph.Text.Text = settings.Text
+			end
+			update()
+		end
+
+		return paragraphApi
+	end
+
 	local function buildFeedbackCard(card)
 		if not card then
 			return nil
@@ -1039,6 +1099,232 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		}
 	end
 
+	local defaultCreditsText = "SorinSoftware Services - Hub development\nNebulaSoftworks - LunaInterface Suite"
+
+	local function formatCredits(credits)
+		if typeof(credits) == "string" then
+			return credits
+		end
+		if typeof(credits) == "table" then
+			local lines = {}
+			for key, value in pairs(credits) do
+				if typeof(value) == "table" then
+					local name = value.name or value.label or value.title or value[1]
+					local role = value.role or value.subtitle or value[2]
+					if name and role then
+						table.insert(lines, string.format("%s - %s", tostring(name), tostring(role)))
+					elseif name then
+						table.insert(lines, tostring(name))
+					end
+				elseif typeof(key) == "number" then
+					table.insert(lines, tostring(value))
+				else
+					table.insert(lines, string.format("%s - %s", tostring(key), tostring(value)))
+				end
+			end
+			return table.concat(lines, "\n")
+		end
+		return defaultCreditsText
+	end
+
+	local function fetchSupportedGamesCount()
+		local tableName = SupabaseConfig.supportedGamesTable
+		if type(tableName) ~= "string" or tableName == "" then
+			return nil, "Supported games table not configured"
+		end
+
+		local queryParts = { "select=id" }
+		if type(SupabaseConfig.supportedGamesFilter) == "string" and SupabaseConfig.supportedGamesFilter ~= "" then
+			table.insert(queryParts, SupabaseConfig.supportedGamesFilter)
+		end
+
+		local limit = tonumber(SupabaseConfig.supportedGamesLimit)
+		if limit and limit > 0 then
+			table.insert(queryParts, "limit=" .. tostring(limit))
+		end
+
+		local path = ("/rest/v1/%s?%s"):format(tableName, table.concat(queryParts, "&"))
+		local response, err = supabaseRequest(path, "GET")
+		if not response then
+			return nil, err
+		end
+
+		local records = decodeJson(response.Body)
+		if typeof(records) ~= "table" then
+			return nil, "Invalid response"
+		end
+
+		if #records > 0 then
+			return #records
+		end
+
+		local count = 0
+		for _ in pairs(records) do
+			count += 1
+		end
+		return count
+	end
+
+	local function buildHubInfoCard(card)
+		if not card then
+			return nil
+		end
+
+		clearCard(card, {HubInfoContent = true})
+		card.ClipsDescendants = true
+
+		local titleLabel = card:FindFirstChild("Title")
+		if titleLabel and titleLabel:IsA("TextLabel") then
+			titleLabel.Text = "Hub Information"
+		end
+
+		local content = createContentFrame(card, "HubInfoContent", true)
+
+		local function backendStatusText()
+			if not isSupabaseConfigured() then
+				return "Supabase not configured."
+			end
+			if not hasExecutorRequest then
+				return "Executor HTTP function missing (no http_request)."
+			end
+			return "Loading version & info ..."
+		end
+
+		local hubInfoParagraph = createParagraph(content, "Hub Version", backendStatusText())
+		local creditsParagraph = createParagraph(content, "Credits", defaultCreditsText)
+		if hubInfoParagraph and hubInfoParagraph.Instance then
+			hubInfoParagraph.Instance.LayoutOrder = 1
+		end
+		if creditsParagraph and creditsParagraph.Instance then
+			creditsParagraph.Instance.LayoutOrder = 2
+		end
+
+		local function loadHubInfo()
+			if not isSupabaseConfigured() then
+				return
+			end
+
+			if hubInfoParagraph then
+				hubInfoParagraph:Set({
+					Title = "Hub Version",
+					Text = "Loading version & info ...",
+				})
+			end
+			if creditsParagraph then
+				creditsParagraph:Set({
+					Title = "Credits",
+					Text = defaultCreditsText,
+				})
+			end
+
+			if not hasExecutorRequest then
+				if hubInfoParagraph then
+					hubInfoParagraph:Set({
+						Title = "Hub Version",
+						Text = "Backend data cannot be loaded (no http_request).",
+					})
+				end
+				return
+			end
+
+			local tableName = SupabaseConfig.hubInfoTable
+			if type(tableName) ~= "string" or tableName == "" then
+				if hubInfoParagraph then
+					hubInfoParagraph:Set({
+						Title = "Hub Version",
+						Text = "Invalid table name. Check SupabaseConfig.hubInfoTable.",
+					})
+				end
+				return
+			end
+
+			local path = ("/rest/v1/%s?select=*&order=%s.desc&limit=1"):format(
+				tableName,
+				SupabaseConfig.hubInfoOrderColumn or "updated_at"
+			)
+
+			local response, err = supabaseRequest(path, "GET", nil, {
+				Prefer = "return=representation",
+			})
+
+			if not response then
+				if hubInfoParagraph then
+					hubInfoParagraph:Set({
+						Title = "Hub Version",
+						Text = "Backend request failed:\n" .. tostring(err),
+					})
+				end
+				return
+			end
+
+			local records = decodeJson(response.Body) or {}
+			local payload = nil
+			if typeof(records) == "table" then
+				if #records > 0 then
+					payload = records[1]
+				else
+					payload = records
+				end
+			end
+
+			if type(payload) ~= "table" then
+				if hubInfoParagraph then
+					hubInfoParagraph:Set({
+						Title = "Hub Version",
+						Text = "No hub information found.",
+					})
+				end
+				return
+			end
+
+			local version = payload.version or payload.hub_version or "unknown"
+			local lastUpdate = payload.last_update or payload.updated_at or payload.release_date or "unknown"
+			local extra = payload.notes or payload.details or ""
+
+			local infoLines = {
+				"Hub version: " .. tostring(version),
+				"Last update: " .. tostring(lastUpdate),
+			}
+
+			if payload.build or payload.tag then
+				table.insert(infoLines, "Build: " .. tostring(payload.build or payload.tag))
+			end
+
+			if payload.maintainer or payload.maintained_by then
+				table.insert(infoLines, "Maintainer: " .. tostring(payload.maintainer or payload.maintained_by))
+			end
+
+			if extra ~= "" then
+				table.insert(infoLines, "Notes: " .. tostring(extra))
+			end
+
+			local supportedCount, countErr = fetchSupportedGamesCount()
+			if supportedCount then
+				table.insert(infoLines, "Supported games: " .. tostring(supportedCount))
+			elseif countErr then
+				table.insert(infoLines, "Supported games: unavailable")
+			end
+
+			if hubInfoParagraph then
+				hubInfoParagraph:Set({
+					Title = "Hub Version",
+					Text = table.concat(infoLines, "\n"),
+				})
+			end
+
+			if payload.credits and creditsParagraph then
+				creditsParagraph:Set({
+					Title = "Credits",
+					Text = formatCredits(payload.credits),
+				})
+			end
+		end
+
+		return {
+			load = loadHubInfo,
+		}
+	end
+
 	local function buildEnvironmentCard(card)
 		if not card then
 			return nil
@@ -1120,6 +1406,15 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 
 	local environmentCard = dashboard and dashboard:FindFirstChild("Server")
 	local feedbackCard = dashboard and dashboard:FindFirstChild("Friends")
+	local hubInfoCard = dashboard and dashboard:FindFirstChild("HubInfo")
+	if not hubInfoCard and dashboard then
+		local templateCard = environmentCard or feedbackCard or discordCard or clientCard
+		if templateCard then
+			hubInfoCard = templateCard:Clone()
+			hubInfoCard.Name = "HubInfo"
+			hubInfoCard.Parent = dashboard
+		end
+	end
 
 	if environmentCard then
 		environmentCard.LayoutOrder = 1
@@ -1133,12 +1428,19 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 	if clientCard then
 		clientCard.LayoutOrder = 4
 	end
+	if hubInfoCard then
+		hubInfoCard.LayoutOrder = 5
+	end
 
 	local feedbackUi = buildFeedbackCard(feedbackCard)
+	local hubInfoUi = buildHubInfoCard(hubInfoCard)
 	buildEnvironmentCard(environmentCard)
 
 	if feedbackUi then
 		feedbackUi.updateStatus()
+	end
+	if hubInfoUi and hubInfoUi.load then
+		task.spawn(hubInfoUi.load)
 	end
 
 end
