@@ -157,18 +157,21 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		warn("[HomeTab] dashboard not found in Home UI. Check Aurexis UI asset hierarchy.")
 	end
 
-	local function hasLayout(container)
-		if not container then
-			return false
+	local function chooseHubInfoHost()
+		if detailsHolder then
+			if detailsHolder:IsA("ScrollingFrame") then
+				return detailsHolder, "scroll"
+			end
+			local listLayout = detailsHolder:FindFirstChildWhichIsA("UIListLayout")
+			if listLayout then
+				return detailsHolder, "list"
+			end
+			local hasGrid = detailsHolder:FindFirstChildWhichIsA("UIGridLayout") ~= nil
+			if not hasGrid and not detailsHolder.ClipsDescendants then
+				return detailsHolder, "absolute"
+			end
 		end
-		return container:FindFirstChildWhichIsA("UIGridLayout") ~= nil
-			or container:FindFirstChildWhichIsA("UIListLayout") ~= nil
-	end
-
-	-- Choose a parent that won't override manual positioning
-	local hubInfoParent = detailsHolder or coerceGuiContainer(HomeTabPage)
-	if hubInfoParent and hasLayout(hubInfoParent) then
-		hubInfoParent = coerceGuiContainer(hubInfoParent.Parent) or hubInfoParent
+		return coerceGuiContainer(HomeTabPage), "absolute"
 	end
 
 	local function resolveExecutorName()
@@ -1512,62 +1515,42 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 	local feedbackUi = buildFeedbackCard(feedbackCard)
 	buildEnvironmentCard(environmentCard)
 
-	local hubInfoUi = buildHubInfoCard(hubInfoParent, environmentCard or feedbackCard or discordCard or clientCard)
+	local hubInfoHost, hubInfoMode = chooseHubInfoHost()
+	local hubInfoUi = buildHubInfoCard(hubInfoHost, environmentCard or feedbackCard or discordCard or clientCard)
 
-	local function ensureHubInfoVisible(container, holderLayout, bottom)
-		if not container then
+	local function ensureHubInfoVisible(container, bottom)
+		if not container or not container:IsA("ScrollingFrame") then
 			return
 		end
-
-		if container:IsA("ScrollingFrame") then
-			if holderLayout then
-				local layoutHeight = holderLayout.AbsoluteContentSize.Y
-				local extra = 12
-				container.CanvasSize = UDim2.new(0, 0, 0, math.max(layoutHeight + extra, bottom or 0))
-			else
-				container.CanvasSize = UDim2.new(0, 0, 0, bottom or container.AbsoluteSize.Y)
-			end
-			return
-		end
-
-		if container.ClipsDescendants then
-			container.ClipsDescendants = false
-		end
-
-		if type(bottom) == "number" and container.Size.Y.Scale == 0 then
-			if container.AbsoluteSize.Y < bottom then
-				container.Size = UDim2.new(
-					container.Size.X.Scale,
-					container.Size.X.Offset,
-					0,
-					bottom
-				)
-			end
-		end
+		local safeBottom = math.max(bottom or 0, container.AbsoluteSize.Y)
+		container.CanvasSize = UDim2.new(0, 0, 0, safeBottom)
 	end
 
 	local function positionHubInfoCard()
-		if not hubInfoUi or not hubInfoUi.card or not hubInfoParent or not dashboard then
+		if not hubInfoUi or not hubInfoUi.card or not hubInfoHost or not dashboard then
 			return
 		end
 
 		local card = hubInfoUi.card
-		local holderLayout = hubInfoParent:FindFirstChildWhichIsA("UIListLayout")
 		local cardHeight = 160
 
-		if holderLayout then
+		if hubInfoMode == "list" then
+			local holderLayout = hubInfoHost:FindFirstChildWhichIsA("UIListLayout")
 			card.LayoutOrder = (dashboard.LayoutOrder or 1) + 1
 			card.Size = UDim2.new(1, 0, 0, cardHeight)
-			ensureHubInfoVisible(hubInfoParent, holderLayout)
 		else
 			local spacing = 10
-			local x = dashboard.AbsolutePosition.X - hubInfoParent.AbsolutePosition.X
-			local y = dashboard.AbsolutePosition.Y - hubInfoParent.AbsolutePosition.Y + dashboard.AbsoluteSize.Y + spacing
+			local offset = dashboard.AbsolutePosition - hubInfoHost.AbsolutePosition
+			if hubInfoHost:IsA("ScrollingFrame") then
+				offset = offset + hubInfoHost.CanvasPosition
+			end
+			local x = offset.X
+			local y = offset.Y + dashboard.AbsoluteSize.Y + spacing
 			card.Position = UDim2.new(0, x, 0, y)
 			card.Size = UDim2.new(0, dashboard.AbsoluteSize.X, 0, cardHeight)
 
 			local bottom = y + cardHeight + spacing
-			ensureHubInfoVisible(hubInfoParent, nil, bottom)
+			ensureHubInfoVisible(hubInfoHost, bottom)
 		end
 	end
 
@@ -1579,9 +1562,9 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			dashboard:GetPropertyChangedSignal("AbsoluteSize"):Connect(positionHubInfoCard)
 			dashboard:GetPropertyChangedSignal("AbsolutePosition"):Connect(positionHubInfoCard)
 		end
-		if hubInfoParent then
-			hubInfoParent:GetPropertyChangedSignal("AbsoluteSize"):Connect(positionHubInfoCard)
-			hubInfoParent:GetPropertyChangedSignal("AbsolutePosition"):Connect(positionHubInfoCard)
+		if hubInfoHost then
+			hubInfoHost:GetPropertyChangedSignal("AbsoluteSize"):Connect(positionHubInfoCard)
+			hubInfoHost:GetPropertyChangedSignal("AbsolutePosition"):Connect(positionHubInfoCard)
 		end
 		if hubInfoUi.refresh then
 			task.spawn(hubInfoUi.refresh)
