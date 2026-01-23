@@ -658,13 +658,30 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		return "N/A"
 	end
 
+	local function getTotalMemoryTag()
+		local ok, items = pcall(function()
+			return Enum.DeveloperMemoryTag:GetEnumItems()
+		end)
+		if ok and items then
+			for _, item in ipairs(items) do
+				if item.Name == "Total" then
+					return item
+				end
+			end
+		end
+		return nil
+	end
+
 	local function getMemory()
 		if Stats and typeof(Stats.GetMemoryUsageMbForTag) == "function" then
-			local ok, total = pcall(function()
-				return Stats:GetMemoryUsageMbForTag(Enum.DeveloperMemoryTag.Total)
-			end)
-			if ok and typeof(total) == "number" then
-				return string.format("%.1f MB", total)
+			local totalTag = getTotalMemoryTag()
+			if totalTag then
+				local ok, total = pcall(function()
+					return Stats:GetMemoryUsageMbForTag(totalTag)
+				end)
+				if ok and typeof(total) == "number" then
+					return string.format("%.1f MB", total)
+				end
 			end
 		end
 
