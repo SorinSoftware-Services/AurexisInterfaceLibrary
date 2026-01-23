@@ -962,6 +962,67 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		return paragraphApi
 	end
 
+	local function ensureDetailsScroller(detailsHolderRef, dashboardRef)
+		if not detailsHolderRef then
+			return nil, nil
+		end
+
+		local container = detailsHolderRef
+		if not detailsHolderRef:IsA("ScrollingFrame") then
+			local scroller = detailsHolderRef:FindFirstChild("HomeDetailsScroller")
+			if not (scroller and scroller:IsA("ScrollingFrame")) then
+				scroller = Instance.new("ScrollingFrame")
+				scroller.Name = "HomeDetailsScroller"
+				scroller.BackgroundTransparency = 1
+				scroller.BorderSizePixel = 0
+				scroller.Size = UDim2.new(1, 0, 1, 0)
+				scroller.Position = UDim2.new(0, 0, 0, 0)
+				scroller.CanvasSize = UDim2.new(0, 0, 0, 0)
+				scroller.ScrollBarThickness = 4
+				scroller.ScrollBarImageTransparency = 0.65
+				scroller.ScrollingDirection = Enum.ScrollingDirection.Y
+				pcall(function()
+					scroller.AutomaticCanvasSize = Enum.AutomaticSize.Y
+				end)
+				scroller.Parent = detailsHolderRef
+			end
+			container = scroller
+		end
+
+		if dashboardRef and dashboardRef.Parent == detailsHolderRef then
+			dashboardRef.Parent = container
+		end
+
+		local layout = container:FindFirstChildWhichIsA("UIListLayout")
+		if not layout then
+			layout = Instance.new("UIListLayout")
+			layout.SortOrder = Enum.SortOrder.LayoutOrder
+			layout.Padding = UDim.new(0, 12)
+			layout.Parent = container
+		else
+			layout.SortOrder = Enum.SortOrder.LayoutOrder
+		end
+
+		if container:IsA("ScrollingFrame") then
+			local okAuto = pcall(function()
+				return container.AutomaticCanvasSize == Enum.AutomaticSize.Y
+			end)
+			if not okAuto then
+				local function updateCanvas()
+					local y = layout.AbsoluteContentSize.Y + 12
+					if y < 0 then
+						y = 0
+					end
+					container.CanvasSize = UDim2.new(0, 0, 0, math.min(y, 5000))
+				end
+				updateCanvas()
+				layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvas)
+			end
+		end
+
+		return container, layout
+	end
+
 
 	local function buildFeedbackCard(card)
 		if not card then
@@ -1434,15 +1495,16 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 
 	local environmentCard = dashboard and dashboard:FindFirstChild("Server")
 	local feedbackCard = dashboard and dashboard:FindFirstChild("Friends")
+	local detailsContainer, detailsLayout = ensureDetailsScroller(detailsHolder, dashboard)
 	local hubInfoCard = nil
-	if detailsHolder then
-		hubInfoCard = detailsHolder:FindFirstChild("HubInfo")
+	if detailsContainer then
+		hubInfoCard = detailsContainer:FindFirstChild("HubInfo")
 		if not hubInfoCard then
 			local templateCard = environmentCard or feedbackCard or discordCard or clientCard
 			if templateCard then
 				hubInfoCard = templateCard:Clone()
 				hubInfoCard.Name = "HubInfo"
-				hubInfoCard.Parent = detailsHolder
+				hubInfoCard.Parent = detailsContainer
 			end
 		end
 	end
@@ -1477,24 +1539,12 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		task.spawn(hubInfoUi.load)
 	end
 
-	if hubInfoCard and detailsHolder and dashboard then
-		local detailsLayout = detailsHolder:FindFirstChildWhichIsA("UIListLayout")
-		if detailsLayout then
+	if detailsLayout then
+		if dashboard then
 			dashboard.LayoutOrder = 1
+		end
+		if hubInfoCard then
 			hubInfoCard.LayoutOrder = 2
-		else
-			local function placeBelow()
-				local y = (dashboard.AbsolutePosition.Y - detailsHolder.AbsolutePosition.Y)
-					+ dashboard.AbsoluteSize.Y + 12
-				hubInfoCard.Position = UDim2.new(0, 0, 0, y)
-				if detailsHolder:IsA("ScrollingFrame") then
-					detailsHolder.CanvasSize = UDim2.new(0, 0, 0, y + hubInfoCard.AbsoluteSize.Y + 12)
-				end
-			end
-			placeBelow()
-			dashboard:GetPropertyChangedSignal("AbsoluteSize"):Connect(placeBelow)
-			dashboard:GetPropertyChangedSignal("AbsolutePosition"):Connect(placeBelow)
-			hubInfoCard:GetPropertyChangedSignal("AbsoluteSize"):Connect(placeBelow)
 		end
 	end
 
