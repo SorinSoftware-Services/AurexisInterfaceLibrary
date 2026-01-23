@@ -8,152 +8,6 @@ local Stats = game:GetService("Stats")
 
 return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween, Release, isStudio)
     function Window:CreateHomeTab(HomeTabSettings)
--- 1) Load AurexisInterface Library
-if getgenv then
-    getgenv().AurexisBaseUrl = "https://raw.githubusercontent.com/SorinSoftware-Services/AurexisInterfaceLibrary/Developer/AurexisLib/"
-end
-local Aurexis = loadstring(game:HttpGet("https://raw.githubusercontent.com/SorinSoftware-Services/AurexisInterfaceLibrary/Developer/AurexisLib/main.lua"))()
-
--- Toggle key store (backed by Aurexis library)
-local toggleStore
-do
-    local service = Aurexis and Aurexis.ToggleKeyService
-    if type(service) == "table" and type(service.new) == "function" then
-        toggleStore = service.new({
-            folder = "SorinHubConfig",
-            file = "interface-toggle.txt",
-            envKey = "__SorinHubToggleKey",
-        })
-
-        -- optional: keep backwards-compatible global handle
-        if toggleStore and type(toggleStore.expose) == "function" then
-            toggleStore:expose("SorinHubToggleKeyStore")
-        end
-    end
-end
-
--- Safe wrappers for optional API
-local function try(fn, ...)
-    local ok, res = pcall(fn, ...)
-    return ok, res
-end
-
--- 2) Build window (we'll briefly hide it while we preload)
-local Window = Aurexis:CreateWindow({
-    Name = "Sorin Script Hub",
-    Subtitle = "SorinSoftwares",
-    LoadingEnabled = true,
-    ConfigSettings = { RootFolder = nil, 
-    ConfigFolder = "SorinHubConfig" },
-    KeySystem = false,
-})
-
-do
-    local savedToggle
-    if toggleStore and type(toggleStore.load) == "function" then
-        savedToggle = toggleStore:load()
-    end
-    if savedToggle and type(Window) == "table" and typeof(Window.SetToggleBind) == "function" then
-        local ok, success, message = pcall(Window.SetToggleBind, Window, savedToggle)
-        if not ok then
-            warn("[SorinHub] Failed to apply saved toggle key:", success)
-        elseif not success then
-            warn("[SorinHub] Saved toggle key rejected:", message)
-        end
-    end
-end
--- try to hide while we fetch (if supported)
-try(function() Window:SetVisible(false) end)
-try(function() Window:SetMinimized(true) end)
-
--- Quick notify (will show once visible)
-Aurexis:Notification({ Title="Sorin Script Hub", Icon="emoji_emotions", ImageSource="Material", Content="Have A Nice Day :D" })
-
--- 3) Remote modules
-local TABS = {
-    FEScripts        = "https://raw.githubusercontent.com/sorin-code-softwares/285e0deb-ec6e-4a23-9c0b-e33eb2301255/main/main/FE-Scripts.lua",
-    UniversalScripts = "https://raw.githubusercontent.com/sorin-code-softwares/285e0deb-ec6e-4a23-9c0b-e33eb2301255/main/main/UniversalScripts.lua",
-    HubInfo          = "https://raw.githubusercontent.com/sorin-code-softwares/285e0deb-ec6e-4a23-9c0b-e33eb2301255/main/main/HubInfo.lua",
-    VisualsGraphics  = "https://raw.githubusercontent.com/sorin-code-softwares/285e0deb-ec6e-4a23-9c0b-e33eb2301255/main/main/visuals_and_graphics.lua",
-    CurrentGame      = "https://raw.githubusercontent.com/sorin-code-softwares/285e0deb-ec6e-4a23-9c0b-e33eb2301255/main/main/current-game/game-loader.lua",
-    ManagerCfg       = "https://scripts.sorinservice.online/sorin/game-manager",
-    Dev              = "https://raw.githubusercontent.com/sorin-code-softwares/285e0deb-ec6e-4a23-9c0b-e33eb2301255/main/main/current-game/Developer.lua"
-}
-
--- 4) Helpers (no cachebusters on raw)
-local function safeRequire(url)
-    local ok, body = pcall(function() return game:HttpGet(url) end)
-    if not ok then return nil, "HttpGet failed: " .. tostring(body) end
-    local fn, lerr = loadstring(body)
-    if not fn then return nil, "loadstring failed: " .. tostring(lerr) end
-    local ok2, res = pcall(fn)
-    if not ok2 then return nil, "module pcall failed: " .. tostring(res) end
-    return res
-end
-
-local function attachTab(name, url, icon, ctx)
-    local Tab = Window:CreateTab({ Name = name, Icon = icon or "sparkle", ImageSource = "Material", ShowTitle = true })
-    local mod, err = safeRequire(url)
-    if not mod then
-        Tab:CreateLabel({ Text = "Error loading '"..name.."': "..tostring(err), Style = 3 })
-        return
-    end
-    local ok, msg = pcall(mod, Tab, Aurexis, Window, ctx) -- pass ctx through
-    if not ok then
-        Tab:CreateLabel({ Text = "Init error '"..name.."': "..tostring(msg), Style = 3 })
-    end
-end
-
--- 5) Preload manager ONCE, compute ctx & title (PlaceId or UniverseId)
-local currentGameTitle = "Current Game"
-local preCtx = nil do
-    local cfg, err = safeRequire(TABS.ManagerCfg)
-    if cfg and type(cfg) == "table" then
-        local placeId = game.PlaceId
-        local universeId = game.GameId
-        local entry = nil
-
-        if type(cfg.byPlace) == "table" then
-            entry = cfg.byPlace[placeId]
-        end
-        if not entry and type(cfg.byUniverse) == "table" then
-            entry = cfg.byUniverse[universeId]
-        end
-
-        if entry then
-            preCtx = {
-                name = entry.name,
-                module = entry.module,
-                placeId = entry.placeId or placeId,
-                universeId = entry.universeId or universeId,
-            }
-            if entry.name and #entry.name > 0 then
-                currentGameTitle = entry.name
-            end
-        end
-    end
-end
-
--- 6) Home tab last (guard: avoid hard error if HomeTab failed to load)
-if type(Window.CreateHomeTab) == "function" then
-    Window:CreateHomeTab()
-end
-
--- 7) Create tabs (now they'll appear already titled & populated)
-attachTab("Universal Scripts",  TABS.UniversalScripts, "admin_panel_settings")
-attachTab("FE Scripts",         TABS.FEScripts,        "insert_emoticon") 
-attachTab("Visuals & Graphics", TABS.VisualsGraphics,  "remove_red_eye")
-attachTab("Hub Info",           TABS.HubInfo,          "info")
-attachTab("Dev",                TABS.Dev,              "settings")
-
--- Dynamisches Icon je nach Support
-local currentIcon = preCtx and "data_usage" or "_error_outline"
-attachTab(currentGameTitle, TABS.CurrentGame, currentIcon, preCtx)
-
-
--- Show window now that we’re done
-try(function() Window:SetMinimized(false) end)
-try(function() Window:SetVisible(true) end)
 
 
 	HomeTabSettings = Kwargify({
@@ -166,11 +20,6 @@ try(function() Window:SetVisible(true) end)
 			url = "https://udnvaneupscmrgwutamv.supabase.co",
 			anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkbnZhbmV1cHNjbXJnd3V0YW12Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ1NjEyMzAsImV4cCI6MjA3MDEzNzIzMH0.7duKofEtgRarIYDAoMfN7OEkOI_zgkG2WzAXZlxl5J0",
 			feedbackFunction = "submit_feedback",
-			hubInfoTable = "hub_metadata",
-			hubInfoOrderColumn = "updated_at",
-			supportedGamesTable = "games",
-			supportedGamesFilter = "is_active=eq.true",
-			supportedGamesLimit = 1000,
 		},
 	}, HomeTabSettings or {})
 
@@ -184,7 +33,9 @@ try(function() Window:SetVisible(true) end)
 
 	local HomeTabPage = Elements.Home
 	HomeTabPage.Visible = true
-	local alreadyReady = HomeTabPage:GetAttribute("SorinHomeTabReady")
+	if HomeTabPage:GetAttribute("SorinHomeTabReady") then
+		return
+	end
 	HomeTabPage:SetAttribute("SorinHomeTabReady", true)
 
 	function HomeTab:Activate()
@@ -207,13 +58,11 @@ try(function() Window:SetVisible(true) end)
 		Window.CurrentTab = "Home"
 	end
 
-	if not alreadyReady then
+	HomeTab:Activate()
+	FirstTab = false
+	HomeTabButton.Interact.MouseButton1Click:Connect(function()
 		HomeTab:Activate()
-		FirstTab = false
-		HomeTabButton.Interact.MouseButton1Click:Connect(function()
-			HomeTab:Activate()
-		end)
-	end
+	end)
 
 	-- === UI SETUP ===
 	HomeTabPage.icon.ImageLabel.Image = Players:GetUserThumbnailAsync(Players.LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
@@ -238,87 +87,8 @@ try(function() Window:SetVisible(true) end)
 	HomeTabPage.player.Text.Text = string.format("%s, %s", getGreeting(), Players.LocalPlayer.DisplayName)
 
 
-	local function findDescendantByName(root, name)
-		if not root or type(name) ~= "string" or name == "" then
-			return nil
-		end
-		local direct = root:FindFirstChild(name)
-		if direct then
-			return direct
-		end
-		local recursive = root:FindFirstChild(name, true)
-		if recursive then
-			return recursive
-		end
-		local needle = string.lower(name)
-		for _, child in ipairs(root:GetDescendants()) do
-			if string.lower(child.Name) == needle then
-				return child
-			end
-		end
-		return nil
-	end
-
-	local function coerceGuiContainer(node)
-		if not node then
-			return nil
-		end
-		if node:IsA("Frame") or node:IsA("ScrollingFrame") then
-			return node
-		end
-		return nil
-	end
-
-	local detailsHolder = coerceGuiContainer(findDescendantByName(HomeTabPage, "detailsholder"))
-	local dashboard = nil
-	if detailsHolder then
-		dashboard = coerceGuiContainer(findDescendantByName(detailsHolder, "dashboard"))
-	end
-	if not dashboard then
-		dashboard = coerceGuiContainer(findDescendantByName(HomeTabPage, "dashboard"))
-	end
-
-	-- Fallback: detect parent containers by common card names
-	if not dashboard then
-		local cardNames = {"Server", "Friends", "Discord", "Client"}
-		for _, cardName in ipairs(cardNames) do
-			local card = findDescendantByName(HomeTabPage, cardName)
-			if card and card.Parent then
-				dashboard = coerceGuiContainer(card.Parent)
-				if dashboard then
-					break
-				end
-			end
-		end
-	end
-
-	if not detailsHolder and dashboard and dashboard.Parent then
-		detailsHolder = coerceGuiContainer(dashboard.Parent)
-	end
-
-	if not detailsHolder then
-		warn("[HomeTab] detailsholder not found in Home UI. Check Aurexis UI asset hierarchy.")
-	end
-	if not dashboard then
-		warn("[HomeTab] dashboard not found in Home UI. Check Aurexis UI asset hierarchy.")
-	end
-
-	local function chooseHubInfoHost()
-		if detailsHolder then
-			if detailsHolder:IsA("ScrollingFrame") then
-				return detailsHolder, "scroll"
-			end
-			local listLayout = detailsHolder:FindFirstChildWhichIsA("UIListLayout")
-			if listLayout then
-				return detailsHolder, "list"
-			end
-			local hasGrid = detailsHolder:FindFirstChildWhichIsA("UIGridLayout") ~= nil
-			if not hasGrid and not detailsHolder.ClipsDescendants then
-				return detailsHolder, "absolute"
-			end
-		end
-		return coerceGuiContainer(HomeTabPage), "absolute"
-	end
+	local detailsHolder = HomeTabPage:FindFirstChild("detailsholder")
+	local dashboard = detailsHolder and detailsHolder:FindFirstChild("dashboard")
 
 	local function resolveExecutorName()
 		if isStudio then
@@ -436,11 +206,6 @@ try(function() Window:SetVisible(true) end)
 		url = "",
 		anonKey = "",
 		feedbackFunction = "submit_feedback",
-		hubInfoTable = "hub_metadata",
-		hubInfoOrderColumn = "updated_at",
-		supportedGamesTable = "games",
-		supportedGamesFilter = "is_active=eq.true",
-		supportedGamesLimit = 1000,
 	}
 
 	if type(HomeTabSettings.Supabase) == "table" then
@@ -649,71 +414,6 @@ try(function() Window:SetVisible(true) end)
 			return decoded
 		end
 		return nil
-	end
-
-	local function formatCredits(credits)
-		if typeof(credits) == "string" then
-			return credits
-		end
-		if typeof(credits) == "table" then
-			local lines = {}
-			for key, value in pairs(credits) do
-				if typeof(value) == "table" then
-					local name = value.name or value.label or value.title or value[1]
-					local role = value.role or value.subtitle or value[2]
-					if name and role then
-						table.insert(lines, string.format("%s - %s", tostring(name), tostring(role)))
-					elseif name then
-						table.insert(lines, tostring(name))
-					end
-				elseif typeof(key) == "number" then
-					table.insert(lines, tostring(value))
-				else
-					table.insert(lines, string.format("%s - %s", tostring(key), tostring(value)))
-				end
-			end
-			return table.concat(lines, "\n")
-		end
-		return "SorinSoftware Services - Hub development\nNebulaSoftworks - LunaInterface Suite"
-	end
-
-	local function fetchSupportedGamesCount()
-		local tableName = SupabaseConfig.supportedGamesTable
-		if type(tableName) ~= "string" or tableName == "" then
-			return nil, "Supported games table not configured"
-		end
-
-		local queryParts = { "select=id" }
-
-		if type(SupabaseConfig.supportedGamesFilter) == "string" and SupabaseConfig.supportedGamesFilter ~= "" then
-			table.insert(queryParts, SupabaseConfig.supportedGamesFilter)
-		end
-
-		local limit = tonumber(SupabaseConfig.supportedGamesLimit)
-		if limit and limit > 0 then
-			table.insert(queryParts, "limit=" .. tostring(limit))
-		end
-
-		local path = ("/rest/v1/%s?%s"):format(tableName, table.concat(queryParts, "&"))
-		local response, err = supabaseRequest(path, "GET")
-		if not response then
-			return nil, err
-		end
-
-		local records = decodeJson(response.Body)
-		if typeof(records) ~= "table" then
-			return nil, "Invalid response"
-		end
-
-		if #records > 0 then
-			return #records
-		end
-
-		local count = 0
-		for _ in pairs(records) do
-			count += 1
-		end
-		return count
 	end
 
 	local networkStatsContainer = nil
@@ -1348,7 +1048,7 @@ try(function() Window:SetVisible(true) end)
 		local statsBlock = createBlock(content, 114, Color3.fromRGB(24, 24, 30), Color3.fromRGB(70, 60, 90))
 		statsBlock.Name = "EnvironmentStats"
 		statsBlock.LayoutOrder = 1
-		statsBlock.BackgroundTransparency = 0.65
+		statsBlock.BackgroundTransparency = 0.80
 
 		local statsTitle = Instance.new("TextLabel")
 		statsTitle.Name = "StatsTitle"
@@ -1394,247 +1094,6 @@ try(function() Window:SetVisible(true) end)
 		end)
 	end
 
-	local function buildHubInfoCard(parent, templateCard)
-		if not parent then
-			return nil
-		end
-
-		local card = parent:FindFirstChild("HubInfo")
-		if not card then
-			card = Instance.new("Frame")
-		end
-
-		card.Name = "HubInfo"
-		card.Parent = parent
-		card.Visible = true
-		card.BorderSizePixel = 0
-
-		local baseColor = Color3.fromRGB(20, 20, 26)
-		local baseTransparency = 0
-		if templateCard and templateCard:IsA("Frame") then
-			baseColor = templateCard.BackgroundColor3
-			baseTransparency = templateCard.BackgroundTransparency
-		end
-
-		card.BackgroundColor3 = baseColor
-		card.BackgroundTransparency = baseTransparency
-
-		local corner = card:FindFirstChildOfClass("UICorner")
-		if not corner then
-			corner = Instance.new("UICorner")
-			corner.Parent = card
-		end
-		corner.CornerRadius = UDim.new(0, 8)
-
-		local stroke = card:FindFirstChildOfClass("UIStroke")
-		if not stroke then
-			stroke = Instance.new("UIStroke")
-			stroke.Parent = card
-		end
-		stroke.Color = Color3.fromRGB(64, 61, 76)
-		stroke.Transparency = 0.55
-
-		clearCard(card, {HubInfoContent = true})
-
-		local titleLabel = card:FindFirstChild("Title")
-		if not (titleLabel and titleLabel:IsA("TextLabel")) then
-			titleLabel = Instance.new("TextLabel")
-			titleLabel.Name = "Title"
-			titleLabel.BackgroundTransparency = 1
-			titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-			titleLabel.Font = Enum.Font.GothamSemibold
-			titleLabel.TextSize = 14
-			titleLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
-			titleLabel.Size = UDim2.new(1, -16, 0, 18)
-			titleLabel.Position = UDim2.new(0, 12, 0, 8)
-			titleLabel.Parent = card
-		end
-		titleLabel.Text = "Hub Information"
-
-		local content = createContentFrame(card, "HubInfoContent", true)
-		local contentPadding = content:FindFirstChildOfClass("UIPadding")
-		if contentPadding then
-			contentPadding.PaddingTop = UDim.new(0, 4)
-			contentPadding.PaddingBottom = UDim.new(0, 6)
-		end
-
-		local fontStrong = Enum.Font.GothamSemibold
-		local fontBody = Enum.Font.Gotham
-
-		local infoBlock = createBlock(content, 56, Color3.fromRGB(24, 24, 30), Color3.fromRGB(64, 61, 76))
-		infoBlock.Name = "HubInfoBlock"
-		infoBlock.LayoutOrder = 1
-
-		local infoTitle = Instance.new("TextLabel")
-		infoTitle.BackgroundTransparency = 1
-		infoTitle.TextXAlignment = Enum.TextXAlignment.Left
-		infoTitle.Font = fontStrong
-		infoTitle.TextSize = 12
-		infoTitle.TextColor3 = Color3.fromRGB(230, 230, 230)
-		infoTitle.Text = "Hub Version"
-		infoTitle.Size = UDim2.new(1, -4, 0, 12)
-		infoTitle.Parent = infoBlock
-
-		local infoBody = Instance.new("TextLabel")
-		infoBody.BackgroundTransparency = 1
-		infoBody.TextXAlignment = Enum.TextXAlignment.Left
-		infoBody.TextYAlignment = Enum.TextYAlignment.Top
-		infoBody.TextWrapped = true
-		infoBody.Font = fontBody
-		infoBody.TextSize = 12
-		infoBody.TextColor3 = Color3.fromRGB(190, 190, 200)
-		infoBody.Position = UDim2.new(0, 0, 0, 14)
-		infoBody.Size = UDim2.new(1, -4, 1, -16)
-		infoBody.Text = "Loading version & info ..."
-		infoBody.Parent = infoBlock
-
-		local creditsBlock = createBlock(content, 56, Color3.fromRGB(24, 24, 30), Color3.fromRGB(64, 61, 76))
-		creditsBlock.Name = "CreditsBlock"
-		creditsBlock.LayoutOrder = 2
-
-		local creditsTitle = Instance.new("TextLabel")
-		creditsTitle.BackgroundTransparency = 1
-		creditsTitle.TextXAlignment = Enum.TextXAlignment.Left
-		creditsTitle.Font = fontStrong
-		creditsTitle.TextSize = 12
-		creditsTitle.TextColor3 = Color3.fromRGB(230, 230, 230)
-		creditsTitle.Text = "Credits"
-		creditsTitle.Size = UDim2.new(1, -4, 0, 12)
-		creditsTitle.Parent = creditsBlock
-
-		local creditsBody = Instance.new("TextLabel")
-		creditsBody.BackgroundTransparency = 1
-		creditsBody.TextXAlignment = Enum.TextXAlignment.Left
-		creditsBody.TextYAlignment = Enum.TextYAlignment.Top
-		creditsBody.TextWrapped = true
-		creditsBody.Font = fontBody
-		creditsBody.TextSize = 12
-		creditsBody.TextColor3 = Color3.fromRGB(190, 190, 200)
-		creditsBody.Position = UDim2.new(0, 0, 0, 14)
-		creditsBody.Size = UDim2.new(1, -4, 1, -16)
-		creditsBody.Text = "SorinSoftware Services - Hub development\nNebulaSoftworks - LunaInterface Suite"
-		creditsBody.Parent = creditsBlock
-
-		local discordButton = Instance.new("TextButton")
-		discordButton.Name = "HubDiscord"
-		discordButton.AutoButtonColor = false
-		discordButton.Text = "SorinSoftware Discord"
-		discordButton.Font = fontStrong
-		discordButton.TextSize = 13
-		discordButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-		discordButton.BackgroundColor3 = Color3.fromRGB(88, 108, 190)
-		discordButton.Size = UDim2.new(1, 0, 0, 28)
-		discordButton.LayoutOrder = 3
-		discordButton.Parent = content
-
-		local discordCorner = Instance.new("UICorner")
-		discordCorner.CornerRadius = UDim.new(0, 6)
-		discordCorner.Parent = discordButton
-
-		local discordStroke = Instance.new("UIStroke")
-		discordStroke.Transparency = 0.45
-		discordStroke.Color = Color3.fromRGB(110, 140, 220)
-		discordStroke.Parent = discordButton
-
-		discordButton.MouseButton1Click:Connect(function()
-			local inviteUrl = "https://discord.gg/" .. HomeTabSettings.DiscordInvite
-			local copied = false
-			if typeof(setclipboard) == "function" then
-				copied = pcall(setclipboard, inviteUrl)
-			end
-			if copied then
-				notify("Discord", "Invite link copied to clipboard.", "success")
-			else
-				notify("Discord", "Invite link: " .. inviteUrl, "info")
-			end
-		end)
-
-		local function loadHubInfo()
-			local defaultCreditsText = "SorinSoftware Services - Hub development\nNebulaSoftworks - LunaInterface Suite"
-
-			infoBody.Text = "Loading version & info ..."
-			creditsBody.Text = defaultCreditsText
-
-			if not isSupabaseConfigured() then
-				infoBody.Text = "Supabase not configured."
-				return
-			end
-			if not hasExecutorRequest then
-				infoBody.Text = "HTTP support missing (http_request)."
-				return
-			end
-
-			local tableName = SupabaseConfig.hubInfoTable
-			if type(tableName) ~= "string" or tableName == "" then
-				infoBody.Text = "Invalid hub info table."
-				return
-			end
-
-			local orderColumn = SupabaseConfig.hubInfoOrderColumn or "updated_at"
-			local path = ("/rest/v1/%s?select=*&order=%s.desc&limit=1"):format(tableName, orderColumn)
-			local response, err = supabaseRequest(path, "GET", nil, {
-				Prefer = "return=representation",
-			})
-
-			if not response then
-				infoBody.Text = "Backend request failed:\n" .. tostring(err)
-				return
-			end
-
-			local records = decodeJson(response.Body) or {}
-			local payload = nil
-			if typeof(records) == "table" then
-				if #records > 0 then
-					payload = records[1]
-				else
-					payload = records
-				end
-			end
-
-			if type(payload) ~= "table" then
-				infoBody.Text = "No hub information found."
-				return
-			end
-
-			local version = payload.version or payload.hub_version or Release or "unknown"
-			local lastUpdate = payload.last_update or payload.updated_at or payload.release_date or "unknown"
-			local extra = payload.notes or payload.details or ""
-
-			local infoLines = {
-				"Hub version: " .. tostring(version),
-				"Last update: " .. tostring(lastUpdate),
-			}
-
-			if payload.build or payload.tag then
-				table.insert(infoLines, "Build: " .. tostring(payload.build or payload.tag))
-			end
-			if payload.maintainer or payload.maintained_by then
-				table.insert(infoLines, "Maintainer: " .. tostring(payload.maintainer or payload.maintained_by))
-			end
-			if extra ~= "" then
-				table.insert(infoLines, "Notes: " .. tostring(extra))
-			end
-
-			local supportedCount = fetchSupportedGamesCount()
-			if supportedCount then
-				table.insert(infoLines, "Supported games: " .. tostring(supportedCount))
-			end
-
-			infoBody.Text = table.concat(infoLines, "\n")
-
-			if payload.credits then
-				creditsBody.Text = formatCredits(payload.credits)
-			else
-				creditsBody.Text = defaultCreditsText
-			end
-		end
-
-		return {
-			card = card,
-			refresh = loadHubInfo,
-		}
-	end
-
 	if dashboard then
 		local layout = dashboard:FindFirstChildWhichIsA("UIGridLayout") or dashboard:FindFirstChildWhichIsA("UIListLayout")
 		if layout then
@@ -1660,62 +1119,6 @@ try(function() Window:SetVisible(true) end)
 
 	local feedbackUi = buildFeedbackCard(feedbackCard)
 	buildEnvironmentCard(environmentCard)
-
-	local hubInfoHost, hubInfoMode = chooseHubInfoHost()
-	local hubInfoUi = buildHubInfoCard(hubInfoHost, environmentCard or feedbackCard or discordCard or clientCard)
-
-	local function ensureHubInfoVisible(container, bottom)
-		if not container or not container:IsA("ScrollingFrame") then
-			return
-		end
-		local safeBottom = math.max(bottom or 0, container.AbsoluteSize.Y)
-		container.CanvasSize = UDim2.new(0, 0, 0, safeBottom)
-	end
-
-	local function positionHubInfoCard()
-		if not hubInfoUi or not hubInfoUi.card or not hubInfoHost or not dashboard then
-			return
-		end
-
-		local card = hubInfoUi.card
-		local cardHeight = 160
-
-		if hubInfoMode == "list" then
-			local holderLayout = hubInfoHost:FindFirstChildWhichIsA("UIListLayout")
-			card.LayoutOrder = (dashboard.LayoutOrder or 1) + 1
-			card.Size = UDim2.new(1, 0, 0, cardHeight)
-		else
-			local spacing = 10
-			local offset = dashboard.AbsolutePosition - hubInfoHost.AbsolutePosition
-			if hubInfoHost:IsA("ScrollingFrame") then
-				offset = offset + hubInfoHost.CanvasPosition
-			end
-			local x = offset.X
-			local y = offset.Y + dashboard.AbsoluteSize.Y + spacing
-			card.Position = UDim2.new(0, x, 0, y)
-			card.Size = UDim2.new(0, dashboard.AbsoluteSize.X, 0, cardHeight)
-
-			local bottom = y + cardHeight + spacing
-			ensureHubInfoVisible(hubInfoHost, bottom)
-		end
-	end
-
-	if hubInfoUi then
-		positionHubInfoCard()
-		task.defer(positionHubInfoCard)
-		task.delay(0.1, positionHubInfoCard)
-		if dashboard then
-			dashboard:GetPropertyChangedSignal("AbsoluteSize"):Connect(positionHubInfoCard)
-			dashboard:GetPropertyChangedSignal("AbsolutePosition"):Connect(positionHubInfoCard)
-		end
-		if hubInfoHost then
-			hubInfoHost:GetPropertyChangedSignal("AbsoluteSize"):Connect(positionHubInfoCard)
-			hubInfoHost:GetPropertyChangedSignal("AbsolutePosition"):Connect(positionHubInfoCard)
-		end
-		if hubInfoUi.refresh then
-			task.spawn(hubInfoUi.refresh)
-		end
-	end
 
 	if feedbackUi then
 		feedbackUi.updateStatus()
