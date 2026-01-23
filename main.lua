@@ -34,9 +34,9 @@ by Nebula Softworks
 
 
 
-local BASE_URL = "https://raw.githubusercontent.com/SorinSoftware-Services/AurexisInterfaceLibrary/Developer/"
+local BASE_URL = "https://raw.githubusercontent.com/SorinSoftware-Services/AurexisInterfaceLibrary/Unstable/New/"
 
-local Release = " Developerbuild for: Version 1.0.0"
+local Release = "Version 1.0.0"
 
 local Aurexis = { 
 	Folder = "AurexisLibrary UI", 
@@ -45,7 +45,7 @@ local Aurexis = {
 	ThemeGradient = ColorSequence.new{
 		ColorSequenceKeypoint.new(0.00, Color3.fromRGB(173, 216, 255)), -- baby blue
 		ColorSequenceKeypoint.new(0.50, Color3.fromRGB(100, 149, 237)), -- medium blue
-		ColorSequenceKeypoint.new(1.00, Color3.fromRGB(195, 144, 255))  -- lilac
+		ColorSequenceKeypoint.new(1.00, Color3.fromRGB(195, 144, 255))  -- lila
 	} 
 }
 
