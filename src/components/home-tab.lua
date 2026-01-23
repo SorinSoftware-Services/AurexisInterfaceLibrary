@@ -24,7 +24,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			hubInfoOrderColumn = "updated_at",
 			supportedGamesTable = "games",
 			supportedGamesFilter = "is_active=eq.true",
-			supportedGamesLimit = 1000,
+			supportedGamesLimit = 500,
 		},
 	}, HomeTabSettings or {})
 
@@ -70,7 +70,14 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 	end)
 
 	-- === UI SETUP ===
-	HomeTabPage.icon.ImageLabel.Image = Players:GetUserThumbnailAsync(Players.LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
+	task.spawn(function()
+		local ok, thumb = pcall(function()
+			return Players:GetUserThumbnailAsync(Players.LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
+		end)
+		if ok and HomeTabPage and HomeTabPage:FindFirstChild("icon") and HomeTabPage.icon:FindFirstChild("ImageLabel") then
+			HomeTabPage.icon.ImageLabel.Image = thumb
+		end
+	end)
 	HomeTabPage.player.user.RichText = true
 	HomeTabPage.player.user.Text = "You are using <b>" .. Release .. "</b>"
 
@@ -1017,11 +1024,11 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			padding.PaddingLeft = UDim.new(0, 0)
 			padding.PaddingRight = UDim.new(0, 10)
 			padding.PaddingTop = UDim.new(0, 0)
-			padding.PaddingBottom = UDim.new(0, 80)
+			padding.PaddingBottom = UDim.new(0, 120)
 			padding.Parent = container
 		else
 			padding.PaddingRight = UDim.new(0, math.max(padding.PaddingRight.Offset, 10))
-			padding.PaddingBottom = UDim.new(0, math.max(padding.PaddingBottom.Offset, 80))
+			padding.PaddingBottom = UDim.new(0, math.max(padding.PaddingBottom.Offset, 120))
 		end
 
 		local layout = container:FindFirstChildWhichIsA("UIListLayout")
@@ -1040,7 +1047,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			end)
 			if not okAuto then
 				local function updateCanvas()
-					local y = layout.AbsoluteContentSize.Y + 80
+					local y = layout.AbsoluteContentSize.Y + 120
 					if y < 0 then
 						y = 0
 					end
@@ -1253,20 +1260,39 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			return nil, "Supported games table not configured"
 		end
 
-		local queryParts = { "select=id" }
+		local queryParts = { "select=id", "limit=1" }
 		if type(SupabaseConfig.supportedGamesFilter) == "string" and SupabaseConfig.supportedGamesFilter ~= "" then
 			table.insert(queryParts, SupabaseConfig.supportedGamesFilter)
 		end
 
-		local limit = tonumber(SupabaseConfig.supportedGamesLimit)
-		if limit and limit > 0 then
-			table.insert(queryParts, "limit=" .. tostring(limit))
-		end
-
 		local path = ("/rest/v1/%s?%s"):format(tableName, table.concat(queryParts, "&"))
-		local response, err = supabaseRequest(path, "GET")
+		local response, err = supabaseRequest(path, "GET", nil, {
+			Prefer = "count=exact",
+		})
 		if not response then
 			return nil, err
+		end
+
+		local function getHeader(headers, name)
+			if type(headers) ~= "table" then
+				return nil
+			end
+			local target = string.lower(name)
+			for key, value in pairs(headers) do
+				if type(key) == "string" and string.lower(key) == target then
+					return value
+				end
+			end
+			return nil
+		end
+
+		local headers = response.Headers or response.headers or {}
+		local contentRange = getHeader(headers, "content-range")
+		if type(contentRange) == "string" then
+			local total = contentRange:match("/(%d+)$")
+			if total then
+				return tonumber(total)
+			end
 		end
 
 		local records = decodeJson(response.Body)
@@ -1525,18 +1551,29 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		statsText.Text = "Collecting stats..."
 		statsText.Parent = statsBlock
 
-		ensureFpsSampler()
+		task.delay(0.15, ensureFpsSampler)
 		task.spawn(function()
+			task.wait(0.25)
 			while statsText and statsText.Parent do
 				task.wait(1)
 				local fpsValue = getFps()
+				task.wait(0.02)
+				local pingValue = getPing()
+				task.wait(0.02)
+				local uploadValue = getNetworkStat(NETWORK_STAT_ALIASES.upload, "KB/s")
+				task.wait(0.02)
+				local downloadValue = getNetworkStat(NETWORK_STAT_ALIASES.download, "KB/s")
+				task.wait(0.02)
+				local memoryValue = getMemory()
+				task.wait(0.02)
+				local execValue = typeof(identifyexecutor) == "function" and identifyexecutor() or "Unknown"
 				local text = table.concat({
 					string.format("FPS: %s", fpsValue > 0 and tostring(fpsValue) or "N/A"),
-					string.format("Ping: %s", getPing()),
-					string.format("Upload: %s", getNetworkStat(NETWORK_STAT_ALIASES.upload, "KB/s")),
-					string.format("Download: %s", getNetworkStat(NETWORK_STAT_ALIASES.download, "KB/s")),
-					string.format("Memory: %s", getMemory()),
-					string.format("Executor: %s", typeof(identifyexecutor) == "function" and identifyexecutor() or "Unknown"),
+					string.format("Ping: %s", pingValue),
+					string.format("Upload: %s", uploadValue),
+					string.format("Download: %s", downloadValue),
+					string.format("Memory: %s", memoryValue),
+					string.format("Executor: %s", execValue),
 				}, "\n")
 				statsText.Text = text
 			end
