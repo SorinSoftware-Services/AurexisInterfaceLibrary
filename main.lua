@@ -34,9 +34,9 @@ by Nebula Softworks
 
 
 
-local BASE_URL = "https://raw.githubusercontent.com/SorinSoftware-Services/AurexisInterfaceLibrary/main/"
+local BASE_URL = "https://raw.githubusercontent.com/SorinSoftware-Services/AurexisInterfaceLibrary/Developer/"
 
-local Release = "Pre Release [v 0.2.6]"
+local Release = " Developerbuild for: Version 1.0.0"
 
 local Aurexis = { 
 	Folder = "AurexisLibrary UI", 
@@ -1875,10 +1875,21 @@ function Aurexis:CreateWindow(WindowSettings)
 local HomeTabModule = requireRemote("src/components/home-tab.lua")
 local attachSectionControls = requireRemote("src/components/section-controls.lua")
 local attachTabControls = requireRemote("src/components/tab-controls.lua")
-HomeTabModule(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween, Release, isStudio)
+local homeTabOk, homeTabErr = pcall(function()
+	if type(HomeTabModule) == "function" then
+		HomeTabModule(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween, Release, isStudio)
+	end
+end)
+if not homeTabOk then
+	warn("[Aurexis] HomeTab module failed to load:", homeTabErr)
+end
 
 -- HomeTab jetzt ERSTELLEN (sonst bleibt alles leer)
-Window:CreateHomeTab()
+if type(Window.CreateHomeTab) == "function" then
+	Window:CreateHomeTab()
+else
+	warn("[Aurexis] CreateHomeTab missing - Home tab skipped.")
+end
 
 FirstTab = false
 
