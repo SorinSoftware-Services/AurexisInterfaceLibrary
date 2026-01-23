@@ -1017,10 +1017,10 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			padding.PaddingLeft = UDim.new(0, 0)
 			padding.PaddingRight = UDim.new(0, 0)
 			padding.PaddingTop = UDim.new(0, 0)
-			padding.PaddingBottom = UDim.new(0, 48)
+			padding.PaddingBottom = UDim.new(0, 64)
 			padding.Parent = container
 		else
-			padding.PaddingBottom = UDim.new(0, math.max(padding.PaddingBottom.Offset, 48))
+			padding.PaddingBottom = UDim.new(0, math.max(padding.PaddingBottom.Offset, 64))
 		end
 
 		local layout = container:FindFirstChildWhichIsA("UIListLayout")
@@ -1039,7 +1039,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			end)
 			if not okAuto then
 				local function updateCanvas()
-					local y = layout.AbsoluteContentSize.Y + 48
+					local y = layout.AbsoluteContentSize.Y + 64
 					if y < 0 then
 						y = 0
 					end
@@ -1304,6 +1304,24 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		end
 
 		local content = createContentFrame(card, "HubInfoContent", false)
+		local contentLayout = content and content:FindFirstChildOfClass("UIListLayout")
+		local contentPadding = content and content:FindFirstChildOfClass("UIPadding")
+
+		local function updateCardHeight()
+			if not contentLayout then
+				return
+			end
+			local paddingTop = contentPadding and contentPadding.PaddingTop.Offset or 0
+			local paddingBottom = contentPadding and contentPadding.PaddingBottom.Offset or 0
+			local contentHeight = contentLayout.AbsoluteContentSize.Y + paddingTop + paddingBottom
+			local target = math.max(220, contentHeight + 44)
+			card.Size = UDim2.new(1, 0, 0, target)
+		end
+
+		if contentLayout then
+			updateCardHeight()
+			contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCardHeight)
+		end
 
 		local function backendStatusText()
 			if not isSupabaseConfigured() then
@@ -1443,6 +1461,8 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 					Text = formatCredits(payload.credits),
 				})
 			end
+
+			updateCardHeight()
 		end
 
 		return {
