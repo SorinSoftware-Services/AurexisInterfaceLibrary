@@ -207,6 +207,27 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		return url
 	end
 
+	local function appendApiKey(url, key)
+		if type(url) ~= "string" then
+			return ""
+		end
+		if type(key) ~= "string" or key == "" then
+			return url
+		end
+		if url:find("apikey=") then
+			return url
+		end
+		local encoded = key
+		local ok, result = pcall(function()
+			return HttpService:UrlEncode(key)
+		end)
+		if ok and type(result) == "string" then
+			encoded = result
+		end
+		local sep = url:find("?", 1, true) and "&" or "?"
+		return url .. sep .. "apikey=" .. encoded
+	end
+
 	local SupabaseConfig = {
 		url = "",
 		anonKey = "",
@@ -316,6 +337,11 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		end
 
 		if requestFn then
+			if options.Headers and options.headers == nil then
+				options.headers = options.Headers
+			elseif options.headers and options.Headers == nil then
+				options.Headers = options.headers
+			end
 			local okRequest, response = pcall(requestFn, options)
 			if not okRequest then
 				return nil, "Executor request failed (" .. tostring(requestSource or "unknown") .. "): " .. tostring(response)
@@ -365,6 +391,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		end
 
 		local url = SupabaseConfig.url .. (path:sub(1, 1) == "/" and path or ("/" .. path))
+		url = appendApiKey(url, SupabaseConfig.anonKey)
 
 		local headers = {
 			["Content-Type"] = "application/json",
@@ -1406,13 +1433,16 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 
 	local environmentCard = dashboard and dashboard:FindFirstChild("Server")
 	local feedbackCard = dashboard and dashboard:FindFirstChild("Friends")
-	local hubInfoCard = dashboard and dashboard:FindFirstChild("HubInfo")
-	if not hubInfoCard and dashboard then
-		local templateCard = environmentCard or feedbackCard or discordCard or clientCard
-		if templateCard then
-			hubInfoCard = templateCard:Clone()
-			hubInfoCard.Name = "HubInfo"
-			hubInfoCard.Parent = dashboard
+	local hubInfoCard = nil
+	if detailsHolder then
+		hubInfoCard = detailsHolder:FindFirstChild("HubInfo")
+		if not hubInfoCard then
+			local templateCard = environmentCard or feedbackCard or discordCard or clientCard
+			if templateCard then
+				hubInfoCard = templateCard:Clone()
+				hubInfoCard.Name = "HubInfo"
+				hubInfoCard.Parent = detailsHolder
+			end
 		end
 	end
 
@@ -1428,8 +1458,28 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 	if clientCard then
 		clientCard.LayoutOrder = 4
 	end
+
 	if hubInfoCard then
-		hubInfoCard.LayoutOrder = 5
+		local detailsLayout = detailsHolder and detailsHolder:FindFirstChildWhichIsA("UIListLayout")
+		if detailsLayout then
+			if dashboard then
+				dashboard.LayoutOrder = 1
+			end
+			hubInfoCard.LayoutOrder = 2
+			hubInfoCard.Position = UDim2.new(0, 0, 0, 0)
+		else
+			if dashboard and detailsHolder then
+				local function placeBelow()
+					local y = (dashboard.AbsolutePosition.Y - detailsHolder.AbsolutePosition.Y)
+						+ dashboard.AbsoluteSize.Y + 12
+					hubInfoCard.Position = UDim2.new(0, 0, 0, y)
+				end
+				placeBelow()
+				dashboard:GetPropertyChangedSignal("AbsoluteSize"):Connect(placeBelow)
+				dashboard:GetPropertyChangedSignal("AbsolutePosition"):Connect(placeBelow)
+			end
+		end
+		hubInfoCard.Size = UDim2.new(1, 0, hubInfoCard.Size.Y.Scale, hubInfoCard.Size.Y.Offset)
 	end
 
 	local feedbackUi = buildFeedbackCard(feedbackCard)
