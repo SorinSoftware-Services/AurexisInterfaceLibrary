@@ -12,9 +12,9 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 
 	HomeTabSettings = Kwargify({
 		Icon = 1,
-		GoodExecutors = {"Krnl", "Delta", "Wave", "Seliware", "Velocity", "Volcano", "MacSploit", "Macsploit", "Bunni", "Hydrogen", "Volt", "Sirhut", "Potassium"},
+		GoodExecutors = {"Bunni", "Delta", "Codex", "Cryptic", "ChocoSploit", "Hydrogen", "JJSploit", "MacSploit", "Seliware", "SirHurt", "VegaX", "Velocity", "Volcano", "Volt"},
 		BadExecutors = {"Solara", "Xeno"},
-		DetectedExecutors = {"Swift", "Valex", "Nucleus", "Codex"},
+		DetectedExecutors = {"Swift", "Valex", "Potassium"},
 		DiscordInvite = "XC5hpQQvMX", -- Only the invite code, not the full URL.
 		Supabase = {
 			url = "https://udnvaneupscmrgwutamv.supabase.co",
@@ -125,13 +125,13 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 				message = "Good executor. Scripts should work here."
 			elseif table.find(HomeTabSettings.BadExecutors, exec) then
 				color = Color3.fromRGB(255, 180, 50)
-				message = "Weak executor. Some scripts may fail."
+				message = "Weak executor. Some scripts may not work."
 			elseif table.find(HomeTabSettings.DetectedExecutors, exec) then
 				color = Color3.fromRGB(255, 60, 60)
-				message = "Executor is detected. Do not use it here."
+				message = "Executor could be detected. Find undetected Exec on our Website"
 			else
 				color = Color3.fromRGB(200, 200, 200)
-				message = "Executor not in list. Unknown compatibility."
+				message = "Executor not in my list. Unknown compatibility."
 			end
 
 			clientCard.Subtitle.Text = message
@@ -144,8 +144,26 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 	if discordCard and discordCard:FindFirstChild("Interact") then
 		discordCard.Interact.MouseButton1Click:Connect(function()
 			local inviteUrl = "https://discord.gg/" .. HomeTabSettings.DiscordInvite
+			local copied = false
 			if typeof(setclipboard) == "function" then
-				pcall(setclipboard, inviteUrl)
+				copied = pcall(setclipboard, inviteUrl)
+			end
+			if Aurexis and typeof(Aurexis.Notification) == "function" then
+				if copied then
+					Aurexis:Notification({
+						Title = "Discord",
+						Icon = "check_circle",
+						ImageSource = "Material",
+						Content = "Link copied to clipboard.",
+					})
+				else
+					Aurexis:Notification({
+						Title = "Discord",
+						Icon = "info",
+						ImageSource = "Material",
+						Content = "Invite: " .. inviteUrl,
+					})
+				end
 			end
 			if request then
 				request({
@@ -999,10 +1017,10 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			padding.PaddingLeft = UDim.new(0, 0)
 			padding.PaddingRight = UDim.new(0, 0)
 			padding.PaddingTop = UDim.new(0, 0)
-			padding.PaddingBottom = UDim.new(0, 20)
+			padding.PaddingBottom = UDim.new(0, 48)
 			padding.Parent = container
 		else
-			padding.PaddingBottom = UDim.new(0, math.max(padding.PaddingBottom.Offset, 20))
+			padding.PaddingBottom = UDim.new(0, math.max(padding.PaddingBottom.Offset, 48))
 		end
 
 		local layout = container:FindFirstChildWhichIsA("UIListLayout")
@@ -1021,7 +1039,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			end)
 			if not okAuto then
 				local function updateCanvas()
-					local y = layout.AbsoluteContentSize.Y + 24
+					local y = layout.AbsoluteContentSize.Y + 48
 					if y < 0 then
 						y = 0
 					end
