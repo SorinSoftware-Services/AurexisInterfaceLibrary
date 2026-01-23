@@ -993,6 +993,18 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			dashboardRef.Parent = container
 		end
 
+		local padding = container:FindFirstChildOfClass("UIPadding")
+		if not padding then
+			padding = Instance.new("UIPadding")
+			padding.PaddingLeft = UDim.new(0, 0)
+			padding.PaddingRight = UDim.new(0, 0)
+			padding.PaddingTop = UDim.new(0, 0)
+			padding.PaddingBottom = UDim.new(0, 20)
+			padding.Parent = container
+		else
+			padding.PaddingBottom = UDim.new(0, math.max(padding.PaddingBottom.Offset, 20))
+		end
+
 		local layout = container:FindFirstChildWhichIsA("UIListLayout")
 		if not layout then
 			layout = Instance.new("UIListLayout")
@@ -1009,7 +1021,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			end)
 			if not okAuto then
 				local function updateCanvas()
-					local y = layout.AbsoluteContentSize.Y + 12
+					local y = layout.AbsoluteContentSize.Y + 24
 					if y < 0 then
 						y = 0
 					end
@@ -1261,13 +1273,19 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 
 		clearCard(card, {HubInfoContent = true})
 		card.ClipsDescendants = true
+		card.BackgroundColor3 = Color3.fromRGB(44, 32, 72)
+		if card:FindFirstChildWhichIsA("UIStroke") then
+			card:FindFirstChildWhichIsA("UIStroke").Color = Color3.fromRGB(124, 92, 186)
+			card:FindFirstChildWhichIsA("UIStroke").Transparency = 0.35
+		end
 
 		local titleLabel = card:FindFirstChild("Title")
 		if titleLabel and titleLabel:IsA("TextLabel") then
 			titleLabel.Text = "Hub Information"
+			titleLabel.TextColor3 = Color3.fromRGB(240, 230, 255)
 		end
 
-		local content = createContentFrame(card, "HubInfoContent", true)
+		local content = createContentFrame(card, "HubInfoContent", false)
 
 		local function backendStatusText()
 			if not isSupabaseConfigured() then
@@ -1523,7 +1541,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 	end
 
 	if hubInfoCard then
-		hubInfoCard.Size = UDim2.new(1, 0, hubInfoCard.Size.Y.Scale, hubInfoCard.Size.Y.Offset)
+		hubInfoCard.Size = UDim2.new(1, 0, 0, 200)
 		hubInfoCard.Position = UDim2.new(0, 0, 0, 0)
 		hubInfoCard.Visible = true
 	end
