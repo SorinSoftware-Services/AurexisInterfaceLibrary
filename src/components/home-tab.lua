@@ -1015,12 +1015,13 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		if not padding then
 			padding = Instance.new("UIPadding")
 			padding.PaddingLeft = UDim.new(0, 0)
-			padding.PaddingRight = UDim.new(0, 0)
+			padding.PaddingRight = UDim.new(0, 10)
 			padding.PaddingTop = UDim.new(0, 0)
-			padding.PaddingBottom = UDim.new(0, 64)
+			padding.PaddingBottom = UDim.new(0, 80)
 			padding.Parent = container
 		else
-			padding.PaddingBottom = UDim.new(0, math.max(padding.PaddingBottom.Offset, 64))
+			padding.PaddingRight = UDim.new(0, math.max(padding.PaddingRight.Offset, 10))
+			padding.PaddingBottom = UDim.new(0, math.max(padding.PaddingBottom.Offset, 80))
 		end
 
 		local layout = container:FindFirstChildWhichIsA("UIListLayout")
@@ -1039,7 +1040,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			end)
 			if not okAuto then
 				local function updateCanvas()
-					local y = layout.AbsoluteContentSize.Y + 64
+					local y = layout.AbsoluteContentSize.Y + 80
 					if y < 0 then
 						y = 0
 					end
