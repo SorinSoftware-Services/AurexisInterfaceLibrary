@@ -12,14 +12,19 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 
 	HomeTabSettings = Kwargify({
 		Icon = 1,
-		GoodExecutors = {"Bunni", "Delta", "Codex", "ChocoSploit", "Cryptic", "Hydrogen", "MacSploit", "Seliware", "Sirhurt", "Vega X", "Velocity", "Volcano", "Wave", "Volt"},
+		GoodExecutors = {"Bunni", "Delta", "Codex", "Cryptic", "ChocoSploit", "Hydrogen", "JJSploit", "MacSploit", "Seliware", "SirHurt", "VegaX", "Velocity", "Volcano", "Volt"},
 		BadExecutors = {"Solara", "Xeno"},
-		DetectedExecutors = {"Swift", "Valex", "Nucleus", "Potassium"},
+		DetectedExecutors = {"Swift", "Valex", "Potassium"},
 		DiscordInvite = "XC5hpQQvMX", -- Only the invite code, not the full URL.
 		Supabase = {
 			url = "https://udnvaneupscmrgwutamv.supabase.co",
 			anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkbnZhbmV1cHNjbXJnd3V0YW12Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ1NjEyMzAsImV4cCI6MjA3MDEzNzIzMH0.7duKofEtgRarIYDAoMfN7OEkOI_zgkG2WzAXZlxl5J0",
 			feedbackFunction = "submit_feedback",
+			hubInfoTable = "hub_metadata",
+			hubInfoOrderColumn = "updated_at",
+			supportedGamesTable = "games",
+			supportedGamesFilter = "is_active=eq.true",
+			supportedGamesLimit = 500,
 		},
 	}, HomeTabSettings or {})
 
@@ -65,7 +70,14 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 	end)
 
 	-- === UI SETUP ===
-	HomeTabPage.icon.ImageLabel.Image = Players:GetUserThumbnailAsync(Players.LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
+	task.spawn(function()
+		local ok, thumb = pcall(function()
+			return Players:GetUserThumbnailAsync(Players.LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
+		end)
+		if ok and HomeTabPage and HomeTabPage:FindFirstChild("icon") and HomeTabPage.icon:FindFirstChild("ImageLabel") then
+			HomeTabPage.icon.ImageLabel.Image = thumb
+		end
+	end)
 	HomeTabPage.player.user.RichText = true
 	HomeTabPage.player.user.Text = "You are using <b>" .. Release .. "</b>"
 
@@ -120,13 +132,13 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 				message = "Good executor. Scripts should work here."
 			elseif table.find(HomeTabSettings.BadExecutors, exec) then
 				color = Color3.fromRGB(255, 180, 50)
-				message = "Weak executor. Some scripts may fail."
+				message = "Weak executor. Some scripts may not work."
 			elseif table.find(HomeTabSettings.DetectedExecutors, exec) then
 				color = Color3.fromRGB(255, 60, 60)
-				message = "Executor is detected. Do not use it here."
+				message = "Executor could be detected. Find undetected Exec on our Website"
 			else
 				color = Color3.fromRGB(200, 200, 200)
-				message = "Executor not in list. Unknown compatibility."
+				message = "Executor not in my list. Unknown compatibility."
 			end
 
 			clientCard.Subtitle.Text = message
@@ -139,8 +151,26 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 	if discordCard and discordCard:FindFirstChild("Interact") then
 		discordCard.Interact.MouseButton1Click:Connect(function()
 			local inviteUrl = "https://discord.gg/" .. HomeTabSettings.DiscordInvite
+			local copied = false
 			if typeof(setclipboard) == "function" then
-				pcall(setclipboard, inviteUrl)
+				copied = pcall(setclipboard, inviteUrl)
+			end
+			if Aurexis and typeof(Aurexis.Notification) == "function" then
+				if copied then
+					Aurexis:Notification({
+						Title = "Discord",
+						Icon = "check_circle",
+						ImageSource = "Material",
+						Content = "Link copied to clipboard.",
+					})
+				else
+					Aurexis:Notification({
+						Title = "Discord",
+						Icon = "info",
+						ImageSource = "Material",
+						Content = "Invite: " .. inviteUrl,
+					})
+				end
 			end
 			if request then
 				request({
@@ -202,10 +232,36 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		return url
 	end
 
+	local function appendApiKey(url, key)
+		if type(url) ~= "string" then
+			return ""
+		end
+		if type(key) ~= "string" or key == "" then
+			return url
+		end
+		if url:find("apikey=") then
+			return url
+		end
+		local encoded = key
+		local ok, result = pcall(function()
+			return HttpService:UrlEncode(key)
+		end)
+		if ok and type(result) == "string" then
+			encoded = result
+		end
+		local sep = url:find("?", 1, true) and "&" or "?"
+		return url .. sep .. "apikey=" .. encoded
+	end
+
 	local SupabaseConfig = {
 		url = "",
 		anonKey = "",
 		feedbackFunction = "submit_feedback",
+		hubInfoTable = "hub_metadata",
+		hubInfoOrderColumn = "updated_at",
+		supportedGamesTable = "games",
+		supportedGamesFilter = "is_active=eq.true",
+		supportedGamesLimit = 1000,
 	}
 
 	if type(HomeTabSettings.Supabase) == "table" then
@@ -306,6 +362,11 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		end
 
 		if requestFn then
+			if options.Headers and options.headers == nil then
+				options.headers = options.Headers
+			elseif options.headers and options.Headers == nil then
+				options.Headers = options.headers
+			end
 			local okRequest, response = pcall(requestFn, options)
 			if not okRequest then
 				return nil, "Executor request failed (" .. tostring(requestSource or "unknown") .. "): " .. tostring(response)
@@ -355,6 +416,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		end
 
 		local url = SupabaseConfig.url .. (path:sub(1, 1) == "/" and path or ("/" .. path))
+		url = appendApiKey(url, SupabaseConfig.anonKey)
 
 		local headers = {
 			["Content-Type"] = "application/json",
@@ -658,13 +720,30 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		return "N/A"
 	end
 
+	local function getTotalMemoryTag()
+		local ok, items = pcall(function()
+			return Enum.DeveloperMemoryTag:GetEnumItems()
+		end)
+		if ok and items then
+			for _, item in ipairs(items) do
+				if item.Name == "Total" then
+					return item
+				end
+			end
+		end
+		return nil
+	end
+
 	local function getMemory()
 		if Stats and typeof(Stats.GetMemoryUsageMbForTag) == "function" then
-			local ok, total = pcall(function()
-				return Stats:GetMemoryUsageMbForTag(Enum.DeveloperMemoryTag.Total)
-			end)
-			if ok and typeof(total) == "number" then
-				return string.format("%.1f MB", total)
+			local totalTag = getTotalMemoryTag()
+			if totalTag then
+				local ok, total = pcall(function()
+					return Stats:GetMemoryUsageMbForTag(totalTag)
+				end)
+				if ok and typeof(total) == "number" then
+					return string.format("%.1f MB", total)
+				end
 			end
 		end
 
@@ -858,6 +937,141 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		return box, wrapper
 	end
 
+	local function createParagraph(parent, title, text)
+		if not (Elements and Elements.Template and Elements.Template.Paragraph) then
+			return nil
+		end
+
+		local paragraph = Elements.Template.Paragraph:Clone()
+		paragraph.Visible = true
+		paragraph.Parent = parent
+
+		if paragraph:FindFirstChild("Title") then
+			paragraph.Title.Text = title or ""
+			paragraph.Title.TextTransparency = 0
+		end
+		if paragraph:FindFirstChild("Text") then
+			paragraph.Text.Text = text or ""
+			paragraph.Text.TextTransparency = 0
+		end
+		paragraph.BackgroundTransparency = 1
+		if paragraph:FindFirstChild("UIStroke") then
+			paragraph.UIStroke.Transparency = 0.5
+		end
+
+		local function update()
+			if paragraph:FindFirstChild("Text") then
+				paragraph.Text.Size = UDim2.new(paragraph.Text.Size.X.Scale, paragraph.Text.Size.X.Offset, 0, math.huge)
+				paragraph.Text.Size = UDim2.new(paragraph.Text.Size.X.Scale, paragraph.Text.Size.X.Offset, 0, paragraph.Text.TextBounds.Y)
+				paragraph.Size = UDim2.new(paragraph.Size.X.Scale, paragraph.Size.X.Offset, 0, paragraph.Text.TextBounds.Y + 40)
+			end
+		end
+
+		update()
+
+		local paragraphApi = {
+			Instance = paragraph,
+		}
+
+		function paragraphApi:Set(settings)
+			settings = settings or {}
+			if settings.Title ~= nil and paragraph:FindFirstChild("Title") then
+				paragraph.Title.Text = settings.Title
+			end
+			if settings.Text ~= nil and paragraph:FindFirstChild("Text") then
+				paragraph.Text.Text = settings.Text
+			end
+			update()
+		end
+
+		return paragraphApi
+	end
+
+	local function ensureDetailsScroller(detailsHolderRef, dashboardRef)
+		if not detailsHolderRef then
+			return nil, nil
+		end
+
+		local container = detailsHolderRef
+		if not detailsHolderRef:IsA("ScrollingFrame") then
+			local scroller = detailsHolderRef:FindFirstChild("HomeDetailsScroller")
+			if not (scroller and scroller:IsA("ScrollingFrame")) then
+				scroller = Instance.new("ScrollingFrame")
+				scroller.Name = "HomeDetailsScroller"
+				scroller.BackgroundTransparency = 1
+				scroller.BorderSizePixel = 0
+				scroller.Size = UDim2.new(1, 0, 1, 0)
+				scroller.Position = UDim2.new(0, 0, 0, 0)
+				scroller.CanvasSize = UDim2.new(0, 0, 0, 0)
+				scroller.ScrollBarThickness = 4
+				scroller.ScrollBarImageTransparency = 0.65
+				scroller.ScrollingDirection = Enum.ScrollingDirection.Y
+				pcall(function()
+					scroller.AutomaticCanvasSize = Enum.AutomaticSize.Y
+				end)
+				scroller.Parent = detailsHolderRef
+			end
+			container = scroller
+		end
+
+		if container:IsA("ScrollingFrame") then
+			container.Active = true
+			container.ScrollingEnabled = true
+			container.ScrollingDirection = Enum.ScrollingDirection.Y
+			container.ScrollBarInset = Enum.ScrollBarInset.Always
+			pcall(function()
+				container.AutomaticCanvasSize = Enum.AutomaticSize.Y
+			end)
+		end
+
+		if dashboardRef and dashboardRef.Parent == detailsHolderRef then
+			dashboardRef.Parent = container
+		end
+
+		local padding = container:FindFirstChildOfClass("UIPadding")
+		if not padding then
+			padding = Instance.new("UIPadding")
+			padding.PaddingLeft = UDim.new(0, 0)
+			padding.PaddingRight = UDim.new(0, 0)
+			padding.PaddingTop = UDim.new(0, 0)
+			padding.PaddingBottom = UDim.new(0, 240)
+			padding.Parent = container
+		else
+			padding.PaddingRight = UDim.new(0, math.max(padding.PaddingRight.Offset, 0))
+			padding.PaddingBottom = UDim.new(0, math.max(padding.PaddingBottom.Offset, 240))
+		end
+
+		local layout = container:FindFirstChildWhichIsA("UIListLayout")
+		if not layout then
+			layout = Instance.new("UIListLayout")
+			layout.SortOrder = Enum.SortOrder.LayoutOrder
+			layout.Padding = UDim.new(0, 12)
+			layout.Parent = container
+		else
+			layout.SortOrder = Enum.SortOrder.LayoutOrder
+		end
+
+		if container:IsA("ScrollingFrame") then
+			local okAuto = pcall(function()
+				return container.AutomaticCanvasSize
+			end)
+			if not okAuto then
+				local function updateCanvas()
+					local y = layout.AbsoluteContentSize.Y + 240
+					if y < 0 then
+						y = 0
+					end
+					container.CanvasSize = UDim2.new(0, 0, 0, math.min(y, 5000))
+				end
+				updateCanvas()
+				layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvas)
+			end
+		end
+
+		return container, layout
+	end
+
+
 	local function buildFeedbackCard(card)
 		if not card then
 			return nil
@@ -1022,6 +1236,277 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		}
 	end
 
+	local defaultCreditsText = "SorinSoftware Services - Hub development\nNebulaSoftworks - LunaInterface Suite"
+
+	local function formatCredits(credits)
+		if typeof(credits) == "string" then
+			return credits
+		end
+		if typeof(credits) == "table" then
+			local lines = {}
+			for key, value in pairs(credits) do
+				if typeof(value) == "table" then
+					local name = value.name or value.label or value.title or value[1]
+					local role = value.role or value.subtitle or value[2]
+					if name and role then
+						table.insert(lines, string.format("%s - %s", tostring(name), tostring(role)))
+					elseif name then
+						table.insert(lines, tostring(name))
+					end
+				elseif typeof(key) == "number" then
+					table.insert(lines, tostring(value))
+				else
+					table.insert(lines, string.format("%s - %s", tostring(key), tostring(value)))
+				end
+			end
+			return table.concat(lines, "\n")
+		end
+		return defaultCreditsText
+	end
+
+	local function fetchSupportedGamesCount()
+		local tableName = SupabaseConfig.supportedGamesTable
+		if type(tableName) ~= "string" or tableName == "" then
+			return nil, "Supported games table not configured"
+		end
+
+		local queryParts = { "select=id", "limit=1" }
+		if type(SupabaseConfig.supportedGamesFilter) == "string" and SupabaseConfig.supportedGamesFilter ~= "" then
+			table.insert(queryParts, SupabaseConfig.supportedGamesFilter)
+		end
+
+		local path = ("/rest/v1/%s?%s"):format(tableName, table.concat(queryParts, "&"))
+		local response, err = supabaseRequest(path, "GET", nil, {
+			Prefer = "count=exact",
+		})
+		if not response then
+			return nil, err
+		end
+
+		local function getHeader(headers, name)
+			if type(headers) ~= "table" then
+				return nil
+			end
+			local target = string.lower(name)
+			for key, value in pairs(headers) do
+				if type(key) == "string" and string.lower(key) == target then
+					return value
+				end
+			end
+			return nil
+		end
+
+		local headers = response.Headers or response.headers or {}
+		local contentRange = getHeader(headers, "content-range")
+		if type(contentRange) == "string" then
+			local total = contentRange:match("/(%d+)$")
+			if total then
+				return tonumber(total)
+			end
+		end
+
+		local records = decodeJson(response.Body)
+		if typeof(records) ~= "table" then
+			return nil, "Invalid response"
+		end
+
+		if #records > 0 then
+			return #records
+		end
+
+		local count = 0
+		for _ in pairs(records) do
+			count += 1
+		end
+		return count
+	end
+
+	local function buildHubInfoCard(card)
+		if not card then
+			return nil
+		end
+
+		clearCard(card, {HubInfoContent = true})
+		card.ClipsDescendants = true
+		card.BackgroundColor3 = Color3.fromRGB(44, 32, 72)
+		if card:FindFirstChildWhichIsA("UIStroke") then
+			card:FindFirstChildWhichIsA("UIStroke").Color = Color3.fromRGB(124, 92, 186)
+			card:FindFirstChildWhichIsA("UIStroke").Transparency = 0.35
+		end
+
+		local titleLabel = card:FindFirstChild("Title")
+		if titleLabel and titleLabel:IsA("TextLabel") then
+			titleLabel.Text = "Hub Information"
+			titleLabel.TextColor3 = Color3.fromRGB(240, 230, 255)
+		end
+
+		local content = createContentFrame(card, "HubInfoContent", false)
+		local contentLayout = content and content:FindFirstChildOfClass("UIListLayout")
+		local contentPadding = content and content:FindFirstChildOfClass("UIPadding")
+
+		local function updateCardHeight()
+			if not contentLayout then
+				return
+			end
+			local paddingTop = contentPadding and contentPadding.PaddingTop.Offset or 0
+			local paddingBottom = contentPadding and contentPadding.PaddingBottom.Offset or 0
+			local contentHeight = contentLayout.AbsoluteContentSize.Y + paddingTop + paddingBottom
+			local target = math.max(220, contentHeight + 44)
+			card.Size = UDim2.new(1, 0, 0, target)
+		end
+
+		if contentLayout then
+			updateCardHeight()
+			contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCardHeight)
+		end
+
+		local function backendStatusText()
+			if not isSupabaseConfigured() then
+				return "Supabase not configured."
+			end
+			if not hasExecutorRequest then
+				return "Executor HTTP function missing (no http_request)."
+			end
+			return "Loading version & info ..."
+		end
+
+		local hubInfoParagraph = createParagraph(content, "Hub Version", backendStatusText())
+		local creditsParagraph = createParagraph(content, "Credits", defaultCreditsText)
+		if hubInfoParagraph and hubInfoParagraph.Instance then
+			hubInfoParagraph.Instance.LayoutOrder = 1
+		end
+		if creditsParagraph and creditsParagraph.Instance then
+			creditsParagraph.Instance.LayoutOrder = 2
+		end
+
+		local function loadHubInfo()
+			if not isSupabaseConfigured() then
+				return
+			end
+
+			if hubInfoParagraph then
+				hubInfoParagraph:Set({
+					Title = "Hub Version",
+					Text = "Loading version & info ...",
+				})
+			end
+			if creditsParagraph then
+				creditsParagraph:Set({
+					Title = "Credits",
+					Text = defaultCreditsText,
+				})
+			end
+
+			if not hasExecutorRequest then
+				if hubInfoParagraph then
+					hubInfoParagraph:Set({
+						Title = "Hub Version",
+						Text = "Backend data cannot be loaded (no http_request).",
+					})
+				end
+				return
+			end
+
+			local tableName = SupabaseConfig.hubInfoTable
+			if type(tableName) ~= "string" or tableName == "" then
+				if hubInfoParagraph then
+					hubInfoParagraph:Set({
+						Title = "Hub Version",
+						Text = "Invalid table name. Check SupabaseConfig.hubInfoTable.",
+					})
+				end
+				return
+			end
+
+			local path = ("/rest/v1/%s?select=*&order=%s.desc&limit=1"):format(
+				tableName,
+				SupabaseConfig.hubInfoOrderColumn or "updated_at"
+			)
+
+			local response, err = supabaseRequest(path, "GET", nil, {
+				Prefer = "return=representation",
+			})
+
+			if not response then
+				if hubInfoParagraph then
+					hubInfoParagraph:Set({
+						Title = "Hub Version",
+						Text = "Backend request failed:\n" .. tostring(err),
+					})
+				end
+				return
+			end
+
+			local records = decodeJson(response.Body) or {}
+			local payload = nil
+			if typeof(records) == "table" then
+				if #records > 0 then
+					payload = records[1]
+				else
+					payload = records
+				end
+			end
+
+			if type(payload) ~= "table" then
+				if hubInfoParagraph then
+					hubInfoParagraph:Set({
+						Title = "Hub Version",
+						Text = "No hub information found.",
+					})
+				end
+				return
+			end
+
+			local version = payload.version or payload.hub_version or "unknown"
+			local lastUpdate = payload.last_update or payload.updated_at or payload.release_date or "unknown"
+			local extra = payload.notes or payload.details or ""
+
+			local infoLines = {
+				"Hub version: " .. tostring(version),
+				"Last update: " .. tostring(lastUpdate),
+			}
+
+			if payload.build or payload.tag then
+				table.insert(infoLines, "Build: " .. tostring(payload.build or payload.tag))
+			end
+
+			if payload.maintainer or payload.maintained_by then
+				table.insert(infoLines, "Maintainer: " .. tostring(payload.maintainer or payload.maintained_by))
+			end
+
+			if extra ~= "" then
+				table.insert(infoLines, "Notes: " .. tostring(extra))
+			end
+
+			local supportedCount, countErr = fetchSupportedGamesCount()
+			if supportedCount then
+				table.insert(infoLines, "Supported games: " .. tostring(supportedCount))
+			elseif countErr then
+				table.insert(infoLines, "Supported games: unavailable")
+			end
+
+			if hubInfoParagraph then
+				hubInfoParagraph:Set({
+					Title = "Hub Version",
+					Text = table.concat(infoLines, "\n"),
+				})
+			end
+
+			if payload.credits and creditsParagraph then
+				creditsParagraph:Set({
+					Title = "Credits",
+					Text = formatCredits(payload.credits),
+				})
+			end
+
+			updateCardHeight()
+		end
+
+		return {
+			load = loadHubInfo,
+		}
+	end
+
 	local function buildEnvironmentCard(card)
 		if not card then
 			return nil
@@ -1076,18 +1561,29 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		statsText.Text = "Collecting stats..."
 		statsText.Parent = statsBlock
 
-		ensureFpsSampler()
+		task.delay(0.15, ensureFpsSampler)
 		task.spawn(function()
+			task.wait(0.25)
 			while statsText and statsText.Parent do
 				task.wait(1)
 				local fpsValue = getFps()
+				task.wait(0.2)
+				local pingValue = getPing()
+				task.wait(0.2)
+				local uploadValue = getNetworkStat(NETWORK_STAT_ALIASES.upload, "KB/s")
+				task.wait(0.2)
+				local downloadValue = getNetworkStat(NETWORK_STAT_ALIASES.download, "KB/s")
+				task.wait(0.2)
+				local memoryValue = getMemory()
+				task.wait(0.2)
+				local execValue = typeof(identifyexecutor) == "function" and identifyexecutor() or "Unknown"
 				local text = table.concat({
 					string.format("FPS: %s", fpsValue > 0 and tostring(fpsValue) or "N/A"),
-					string.format("Ping: %s", getPing()),
-					string.format("Upload: %s", getNetworkStat(NETWORK_STAT_ALIASES.upload, "KB/s")),
-					string.format("Download: %s", getNetworkStat(NETWORK_STAT_ALIASES.download, "KB/s")),
-					string.format("Memory: %s", getMemory()),
-					string.format("Executor: %s", typeof(identifyexecutor) == "function" and identifyexecutor() or "Unknown"),
+					string.format("Ping: %s", pingValue),
+					string.format("Upload: %s", uploadValue),
+					string.format("Download: %s", downloadValue),
+					string.format("Memory: %s", memoryValue),
+					string.format("Executor: %s", execValue),
 				}, "\n")
 				statsText.Text = text
 			end
@@ -1103,6 +1599,19 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 
 	local environmentCard = dashboard and dashboard:FindFirstChild("Server")
 	local feedbackCard = dashboard and dashboard:FindFirstChild("Friends")
+	local detailsContainer, detailsLayout = ensureDetailsScroller(detailsHolder, dashboard)
+	local hubInfoCard = nil
+	if detailsContainer then
+		hubInfoCard = detailsContainer:FindFirstChild("HubInfo")
+		if not hubInfoCard then
+			local templateCard = environmentCard or feedbackCard or discordCard or clientCard
+			if templateCard then
+				hubInfoCard = templateCard:Clone()
+				hubInfoCard.Name = "HubInfo"
+				hubInfoCard.Parent = detailsContainer
+			end
+		end
+	end
 
 	if environmentCard then
 		environmentCard.LayoutOrder = 1
@@ -1117,11 +1626,30 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		clientCard.LayoutOrder = 4
 	end
 
+	if hubInfoCard then
+		hubInfoCard.Size = UDim2.new(1, 0, 0, 200)
+		hubInfoCard.Position = UDim2.new(0, 0, 0, 0)
+		hubInfoCard.Visible = true
+	end
+
 	local feedbackUi = buildFeedbackCard(feedbackCard)
+	local hubInfoUi = buildHubInfoCard(hubInfoCard)
 	buildEnvironmentCard(environmentCard)
 
 	if feedbackUi then
 		feedbackUi.updateStatus()
+	end
+	if hubInfoUi and hubInfoUi.load then
+		task.spawn(hubInfoUi.load)
+	end
+
+	if detailsLayout then
+		if dashboard then
+			dashboard.LayoutOrder = 1
+		end
+		if hubInfoCard then
+			hubInfoCard.LayoutOrder = 2
+		end
 	end
 
 end
