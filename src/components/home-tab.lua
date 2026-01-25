@@ -4,7 +4,6 @@ local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local Stats = game:GetService("Stats")
-local UserInputService = game:GetService("UserInputService")
 
 
 return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween, Release, isStudio)
@@ -13,19 +12,14 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 
 	HomeTabSettings = Kwargify({
 		Icon = 1,
-		GoodExecutors = {"Bunni", "Delta", "Codex", "Cryptic", "ChocoSploit", "Hydrogen", "JJSploit", "MacSploit", "Seliware", "SirHurt", "VegaX", "Velocity", "Volcano", "Volt"},
+		GoodExecutors = {"Bunni", "Delta", "Codex", "ChocoSploit", "Cryptic", "Hydrogen", "MacSploit", "Seliware", "Sirhurt", "Vega X", "Velocity", "Volcano", "Wave", "Volt"},
 		BadExecutors = {"Solara", "Xeno"},
-		DetectedExecutors = {"Swift", "Valex", "Potassium"},
+		DetectedExecutors = {"Swift", "Valex", "Nucleus", "Potassium"},
 		DiscordInvite = "XC5hpQQvMX", -- Only the invite code, not the full URL.
 		Supabase = {
-			url = "https://udnvaneupscmrgwutamv.supabase.co",
-			anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkbnZhbmV1cHNjbXJnd3V0YW12Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ1NjEyMzAsImV4cCI6MjA3MDEzNzIzMH0.7duKofEtgRarIYDAoMfN7OEkOI_zgkG2WzAXZlxl5J0",
+			url = "",
+			anonKey = "",
 			feedbackFunction = "submit_feedback",
-			hubInfoTable = "hub_metadata",
-			hubInfoOrderColumn = "updated_at",
-			supportedGamesTable = "games",
-			supportedGamesFilter = "is_active=eq.true",
-			supportedGamesLimit = 500,
 		},
 	}, HomeTabSettings or {})
 
@@ -71,14 +65,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 	end)
 
 	-- === UI SETUP ===
-	task.spawn(function()
-		local ok, thumb = pcall(function()
-			return Players:GetUserThumbnailAsync(Players.LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
-		end)
-		if ok and HomeTabPage and HomeTabPage:FindFirstChild("icon") and HomeTabPage.icon:FindFirstChild("ImageLabel") then
-			HomeTabPage.icon.ImageLabel.Image = thumb
-		end
-	end)
+	HomeTabPage.icon.ImageLabel.Image = Players:GetUserThumbnailAsync(Players.LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
 	HomeTabPage.player.user.RichText = true
 	HomeTabPage.player.user.Text = "You are using <b>" .. Release .. "</b>"
 
@@ -133,13 +120,13 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 				message = "Good executor. Scripts should work here."
 			elseif table.find(HomeTabSettings.BadExecutors, exec) then
 				color = Color3.fromRGB(255, 180, 50)
-				message = "Weak executor. Some scripts may not work."
+				message = "Weak executor. Some scripts may fail."
 			elseif table.find(HomeTabSettings.DetectedExecutors, exec) then
 				color = Color3.fromRGB(255, 60, 60)
-				message = "Executor could be detected. Find undetected Exec on our Website"
+				message = "Executor is detected. Do not use it here."
 			else
 				color = Color3.fromRGB(200, 200, 200)
-				message = "Executor not in my list. Unknown compatibility."
+				message = "Executor not in list. Unknown compatibility."
 			end
 
 			clientCard.Subtitle.Text = message
@@ -152,26 +139,16 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 	if discordCard and discordCard:FindFirstChild("Interact") then
 		discordCard.Interact.MouseButton1Click:Connect(function()
 			local inviteUrl = "https://discord.gg/" .. HomeTabSettings.DiscordInvite
-			local copied = false
 			if typeof(setclipboard) == "function" then
-				copied = pcall(setclipboard, inviteUrl)
+				pcall(setclipboard, inviteUrl)
 			end
 			if Aurexis and typeof(Aurexis.Notification) == "function" then
-				if copied then
-					Aurexis:Notification({
-						Title = "Discord",
-						Icon = "check_circle",
-						ImageSource = "Material",
-						Content = "Link copied to clipboard.",
-					})
-				else
-					Aurexis:Notification({
-						Title = "Discord",
-						Icon = "info",
-						ImageSource = "Material",
-						Content = "Invite: " .. inviteUrl,
-					})
-				end
+				Aurexis:Notification({
+					Title = "Discord",
+					Icon = "check_circle",
+					ImageSource = "Material",
+					Content = "Link copied to clipboard.",
+				})
 			end
 			if request then
 				request({
@@ -233,36 +210,10 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		return url
 	end
 
-	local function appendApiKey(url, key)
-		if type(url) ~= "string" then
-			return ""
-		end
-		if type(key) ~= "string" or key == "" then
-			return url
-		end
-		if url:find("apikey=") then
-			return url
-		end
-		local encoded = key
-		local ok, result = pcall(function()
-			return HttpService:UrlEncode(key)
-		end)
-		if ok and type(result) == "string" then
-			encoded = result
-		end
-		local sep = url:find("?", 1, true) and "&" or "?"
-		return url .. sep .. "apikey=" .. encoded
-	end
-
 	local SupabaseConfig = {
 		url = "",
 		anonKey = "",
 		feedbackFunction = "submit_feedback",
-		hubInfoTable = "hub_metadata",
-		hubInfoOrderColumn = "updated_at",
-		supportedGamesTable = "games",
-		supportedGamesFilter = "is_active=eq.true",
-		supportedGamesLimit = 1000,
 	}
 
 	if type(HomeTabSettings.Supabase) == "table" then
@@ -363,11 +314,6 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		end
 
 		if requestFn then
-			if options.Headers and options.headers == nil then
-				options.headers = options.Headers
-			elseif options.headers and options.Headers == nil then
-				options.Headers = options.headers
-			end
 			local okRequest, response = pcall(requestFn, options)
 			if not okRequest then
 				return nil, "Executor request failed (" .. tostring(requestSource or "unknown") .. "): " .. tostring(response)
@@ -417,7 +363,6 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		end
 
 		local url = SupabaseConfig.url .. (path:sub(1, 1) == "/" and path or ("/" .. path))
-		url = appendApiKey(url, SupabaseConfig.anonKey)
 
 		local headers = {
 			["Content-Type"] = "application/json",
@@ -721,30 +666,13 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		return "N/A"
 	end
 
-	local function getTotalMemoryTag()
-		local ok, items = pcall(function()
-			return Enum.DeveloperMemoryTag:GetEnumItems()
-		end)
-		if ok and items then
-			for _, item in ipairs(items) do
-				if item.Name == "Total" then
-					return item
-				end
-			end
-		end
-		return nil
-	end
-
 	local function getMemory()
 		if Stats and typeof(Stats.GetMemoryUsageMbForTag) == "function" then
-			local totalTag = getTotalMemoryTag()
-			if totalTag then
-				local ok, total = pcall(function()
-					return Stats:GetMemoryUsageMbForTag(totalTag)
-				end)
-				if ok and typeof(total) == "number" then
-					return string.format("%.1f MB", total)
-				end
+			local ok, total = pcall(function()
+				return Stats:GetMemoryUsageMbForTag(Enum.DeveloperMemoryTag.Total)
+			end)
+			if ok and typeof(total) == "number" then
+				return string.format("%.1f MB", total)
 			end
 		end
 
@@ -938,144 +866,6 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		return box, wrapper
 	end
 
-	local function createParagraph(parent, title, text)
-		if not (Elements and Elements.Template and Elements.Template.Paragraph) then
-			return nil
-		end
-
-		local paragraph = Elements.Template.Paragraph:Clone()
-		paragraph.Visible = true
-		paragraph.Parent = parent
-
-		if paragraph:FindFirstChild("Title") then
-			paragraph.Title.Text = title or ""
-			paragraph.Title.TextTransparency = 0
-		end
-		if paragraph:FindFirstChild("Text") then
-			paragraph.Text.Text = text or ""
-			paragraph.Text.TextTransparency = 0
-		end
-		paragraph.BackgroundTransparency = 1
-		if paragraph:FindFirstChild("UIStroke") then
-			paragraph.UIStroke.Transparency = 0.5
-		end
-
-		local function update()
-			if paragraph:FindFirstChild("Text") then
-				paragraph.Text.Size = UDim2.new(paragraph.Text.Size.X.Scale, paragraph.Text.Size.X.Offset, 0, math.huge)
-				paragraph.Text.Size = UDim2.new(paragraph.Text.Size.X.Scale, paragraph.Text.Size.X.Offset, 0, paragraph.Text.TextBounds.Y)
-				paragraph.Size = UDim2.new(paragraph.Size.X.Scale, paragraph.Size.X.Offset, 0, paragraph.Text.TextBounds.Y + 40)
-			end
-		end
-
-		update()
-
-		local paragraphApi = {
-			Instance = paragraph,
-		}
-
-		function paragraphApi:Set(settings)
-			settings = settings or {}
-			if settings.Title ~= nil and paragraph:FindFirstChild("Title") then
-				paragraph.Title.Text = settings.Title
-			end
-			if settings.Text ~= nil and paragraph:FindFirstChild("Text") then
-				paragraph.Text.Text = settings.Text
-			end
-			update()
-		end
-
-		return paragraphApi
-	end
-
-	local function ensureDetailsScroller(detailsHolderRef, dashboardRef)
-		if not detailsHolderRef then
-			return nil, nil
-		end
-
-		local container = detailsHolderRef
-		if not detailsHolderRef:IsA("ScrollingFrame") then
-			local scroller = detailsHolderRef:FindFirstChild("HomeDetailsScroller")
-			if not (scroller and scroller:IsA("ScrollingFrame")) then
-				scroller = Instance.new("ScrollingFrame")
-				scroller.Name = "HomeDetailsScroller"
-				scroller.BackgroundTransparency = 1
-				scroller.BorderSizePixel = 0
-				scroller.Size = UDim2.new(1, 0, 1, 0)
-				scroller.Position = UDim2.new(0, 0, 0, 0)
-				scroller.CanvasSize = UDim2.new(0, 0, 0, 0)
-				scroller.ScrollBarThickness = 4
-				scroller.ScrollBarImageTransparency = 0.65
-				scroller.ScrollingDirection = Enum.ScrollingDirection.Y
-				pcall(function()
-					scroller.AutomaticCanvasSize = Enum.AutomaticSize.Y
-				end)
-				scroller.Parent = detailsHolderRef
-			end
-			container = scroller
-		end
-
-		local usesAutoCanvas = false
-		if container:IsA("ScrollingFrame") then
-			container.Active = true
-			container.Selectable = true
-			container.ScrollingEnabled = true
-			container.ScrollingDirection = Enum.ScrollingDirection.Y
-			container.ScrollBarThickness = 6
-			pcall(function()
-				container.ScrollBarInset = Enum.ScrollBarInset.None
-			end)
-			local okAuto = pcall(function()
-				container.AutomaticCanvasSize = Enum.AutomaticSize.Y
-			end)
-			usesAutoCanvas = okAuto == true
-		end
-
-		if dashboardRef and dashboardRef.Parent == detailsHolderRef then
-			dashboardRef.Parent = container
-		end
-
-		local padding = container:FindFirstChildOfClass("UIPadding")
-		if not padding then
-			padding = Instance.new("UIPadding")
-			padding.PaddingLeft = UDim.new(0, 0)
-			padding.PaddingRight = UDim.new(0, 0)
-			padding.PaddingTop = UDim.new(0, 0)
-			padding.PaddingBottom = UDim.new(0, 140)
-			padding.Parent = container
-		else
-			padding.PaddingRight = UDim.new(0, math.max(padding.PaddingRight.Offset, 0))
-			padding.PaddingBottom = UDim.new(0, math.max(padding.PaddingBottom.Offset, 140))
-		end
-
-		local layout = container:FindFirstChildWhichIsA("UIListLayout")
-		if not layout then
-			layout = Instance.new("UIListLayout")
-			layout.SortOrder = Enum.SortOrder.LayoutOrder
-			layout.Padding = UDim.new(0, 12)
-			layout.Parent = container
-		else
-			layout.SortOrder = Enum.SortOrder.LayoutOrder
-		end
-		layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
-
-		if container:IsA("ScrollingFrame") and not usesAutoCanvas then
-			local function updateCanvas()
-				local extra = (padding and padding.PaddingBottom.Offset or 0) + 40
-				local y = layout.AbsoluteContentSize.Y + extra
-				if y < 0 then
-					y = 0
-				end
-				container.CanvasSize = UDim2.new(0, 0, 0, math.min(y, 6000))
-			end
-			updateCanvas()
-			layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvas)
-		end
-
-		return container, layout
-	end
-
-
 	local function buildFeedbackCard(card)
 		if not card then
 			return nil
@@ -1089,53 +879,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			titleLabel.Text = "Feedback & Ideas"
 		end
 
-		local isTouch = false
-		if UserInputService then
-			isTouch = UserInputService.TouchEnabled
-			if not isTouch then
-				isTouch = (UserInputService.MouseEnabled == false and UserInputService.KeyboardEnabled == false)
-			end
-		end
-		local allowInnerScroll = not isTouch
-		local content = createContentFrame(card, "FeedbackContent", allowInnerScroll)
-		if content and content:IsA("ScrollingFrame") then
-			content.ScrollBarThickness = 0
-			content.ScrollBarImageTransparency = 1
-		end
-
-		local function resolveBaseHeight()
-			local sizeY = card.Size.Y
-			if sizeY.Scale == 0 and sizeY.Offset > 0 then
-				return sizeY.Offset
-			end
-			if card.AbsoluteSize.Y > 0 then
-				return card.AbsoluteSize.Y
-			end
-			return 180
-		end
-
-		if allowInnerScroll then
-			local sizeX = card.Size.X
-			card.Size = UDim2.new(sizeX.Scale, sizeX.Offset, 0, resolveBaseHeight())
-		else
-			local contentLayout = content and content:FindFirstChildOfClass("UIListLayout")
-			local contentPadding = content and content:FindFirstChildOfClass("UIPadding")
-			local function updateCardHeight()
-				if not contentLayout then
-					return
-				end
-				local paddingTop = contentPadding and contentPadding.PaddingTop.Offset or 0
-				local paddingBottom = contentPadding and contentPadding.PaddingBottom.Offset or 0
-				local contentHeight = contentLayout.AbsoluteContentSize.Y + paddingTop + paddingBottom
-				local target = math.max(180, contentHeight + 44)
-				local sizeX = card.Size.X
-				card.Size = UDim2.new(sizeX.Scale, sizeX.Offset, 0, target)
-			end
-			if contentLayout then
-				updateCardHeight()
-				contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCardHeight)
-			end
-		end
+		local content = createContentFrame(card, "FeedbackContent", true)
 		local fontStrong = Enum.Font.GothamSemibold
 		local fontBody = Enum.Font.Gotham
 
@@ -1340,29 +1084,18 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		statsText.Text = "Collecting stats..."
 		statsText.Parent = statsBlock
 
-		task.delay(0.15, ensureFpsSampler)
+		ensureFpsSampler()
 		task.spawn(function()
-			task.wait(0.25)
 			while statsText and statsText.Parent do
 				task.wait(1)
 				local fpsValue = getFps()
-				task.wait(0.2)
-				local pingValue = getPing()
-				task.wait(0.2)
-				local uploadValue = getNetworkStat(NETWORK_STAT_ALIASES.upload, "KB/s")
-				task.wait(0.2)
-				local downloadValue = getNetworkStat(NETWORK_STAT_ALIASES.download, "KB/s")
-				task.wait(0.2)
-				local memoryValue = getMemory()
-				task.wait(0.2)
-				local execValue = typeof(identifyexecutor) == "function" and identifyexecutor() or "Unknown"
 				local text = table.concat({
 					string.format("FPS: %s", fpsValue > 0 and tostring(fpsValue) or "N/A"),
-					string.format("Ping: %s", pingValue),
-					string.format("Upload: %s", uploadValue),
-					string.format("Download: %s", downloadValue),
-					string.format("Memory: %s", memoryValue),
-					string.format("Executor: %s", execValue),
+					string.format("Ping: %s", getPing()),
+					string.format("Upload: %s", getNetworkStat(NETWORK_STAT_ALIASES.upload, "KB/s")),
+					string.format("Download: %s", getNetworkStat(NETWORK_STAT_ALIASES.download, "KB/s")),
+					string.format("Memory: %s", getMemory()),
+					string.format("Executor: %s", typeof(identifyexecutor) == "function" and identifyexecutor() or "Unknown"),
 				}, "\n")
 				statsText.Text = text
 			end
@@ -1373,94 +1106,22 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		local layout = dashboard:FindFirstChildWhichIsA("UIGridLayout") or dashboard:FindFirstChildWhichIsA("UIListLayout")
 		if layout then
 			layout.SortOrder = Enum.SortOrder.LayoutOrder
-			local function getCardHeight(child)
-				if not (child and child:IsA("GuiObject")) then
-					return 0
-				end
-				if not child.Visible then
-					return 0
-				end
-				if child:IsA("UIGridLayout") or child:IsA("UIListLayout") then
-					return 0
-				end
-				local sizeY = child.Size.Y
-				if sizeY.Scale == 0 and sizeY.Offset > 0 then
-					return sizeY.Offset
-				end
-				return child.AbsoluteSize.Y
-			end
-			local function updateDashboardSize()
-				if layout:IsA("UIGridLayout") then
-					local maxHeight = 0
-					for _, child in ipairs(dashboard:GetChildren()) do
-						local h = getCardHeight(child)
-						if h > maxHeight then
-							maxHeight = h
-						end
-					end
-					if maxHeight > 0 then
-						local cellX = layout.CellSize.X
-						if layout.CellSize.Y.Scale ~= 0 or layout.CellSize.Y.Offset ~= maxHeight then
-							layout.CellSize = UDim2.new(cellX.Scale, cellX.Offset, 0, maxHeight)
-						end
-					end
-				end
-				local height = layout.AbsoluteContentSize.Y
-				if height < 0 then
-					height = 0
-				end
-				local x = dashboard.Size.X
-				dashboard.Size = UDim2.new(x.Scale, x.Offset, 0, height + 6)
-			end
-			local function hookChild(child)
-				if not (child and child:IsA("GuiObject")) then
-					return
-				end
-				child:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateDashboardSize)
-				child:GetPropertyChangedSignal("Size"):Connect(updateDashboardSize)
-				child:GetPropertyChangedSignal("Visible"):Connect(updateDashboardSize)
-			end
-			for _, child in ipairs(dashboard:GetChildren()) do
-				hookChild(child)
-			end
-			dashboard.ChildAdded:Connect(hookChild)
-			dashboard.ChildRemoved:Connect(updateDashboardSize)
-			updateDashboardSize()
-			layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateDashboardSize)
 		end
 	end
 
 	local environmentCard = dashboard and dashboard:FindFirstChild("Server")
 	local feedbackCard = dashboard and dashboard:FindFirstChild("Friends")
-	local detailsContainer, detailsLayout = ensureDetailsScroller(detailsHolder, dashboard)
-	local hubInfoCard = nil
-
-	if dashboard then
-		dashboard.Visible = true
-	end
-	if not environmentCard and dashboard then
-		local templateCard = feedbackCard or discordCard or clientCard
-		if templateCard then
-			environmentCard = templateCard:Clone()
-			environmentCard.Name = "Server"
-			environmentCard.Parent = dashboard
-		end
-	end
 
 	if environmentCard then
-		environmentCard.Visible = true
 		environmentCard.LayoutOrder = 1
 	end
 	if feedbackCard then
-		feedbackCard.Visible = true
 		feedbackCard.LayoutOrder = 2
 	end
 	if discordCard then
-		discordCard.Visible = true
 		discordCard.LayoutOrder = 3
 	end
 	if clientCard then
-		clientCard.Visible = true
 		clientCard.LayoutOrder = 4
 	end
 
@@ -1469,11 +1130,6 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 
 	if feedbackUi then
 		feedbackUi.updateStatus()
-	end
-	if detailsLayout then
-		if dashboard then
-			dashboard.LayoutOrder = 1
-		end
 	end
 
 end
