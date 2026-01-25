@@ -1036,12 +1036,12 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		if not padding then
 			padding = Instance.new("UIPadding")
 			padding.PaddingLeft = UDim.new(0, 0)
-			padding.PaddingRight = UDim.new(0, 6)
+			padding.PaddingRight = UDim.new(0, 0)
 			padding.PaddingTop = UDim.new(0, 0)
 			padding.PaddingBottom = UDim.new(0, 280)
 			padding.Parent = container
 		else
-			padding.PaddingRight = UDim.new(0, math.max(padding.PaddingRight.Offset, 6))
+			padding.PaddingRight = UDim.new(0, math.max(padding.PaddingRight.Offset, 0))
 			padding.PaddingBottom = UDim.new(0, math.max(padding.PaddingBottom.Offset, 280))
 		end
 
@@ -1603,7 +1603,10 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 	local detailsContainer, detailsLayout = ensureDetailsScroller(detailsHolder, dashboard)
 	local hubInfoCard = nil
 	if detailsContainer then
-		hubInfoCard = detailsContainer:FindFirstChild("HubInfo")
+		hubInfoCard = detailsContainer:FindFirstChild("HubInfo") or (dashboard and dashboard:FindFirstChild("HubInfo"))
+		if hubInfoCard and hubInfoCard.Parent ~= detailsContainer then
+			hubInfoCard.Parent = detailsContainer
+		end
 		if not hubInfoCard then
 			local templateCard = environmentCard or feedbackCard or discordCard or clientCard
 			if templateCard then
@@ -1644,7 +1647,10 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 	end
 
 	if hubInfoCard then
-		hubInfoCard.Size = UDim2.new(1, 0, 0, 200)
+		if detailsContainer and hubInfoCard.Parent ~= detailsContainer then
+			hubInfoCard.Parent = detailsContainer
+		end
+		hubInfoCard.Size = UDim2.new(1, 0, hubInfoCard.Size.Y.Scale, hubInfoCard.Size.Y.Offset)
 		hubInfoCard.Position = UDim2.new(0, 0, 0, 0)
 		hubInfoCard.Visible = true
 	end
