@@ -1018,7 +1018,9 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			container.Active = true
 			container.ScrollingEnabled = true
 			container.ScrollingDirection = Enum.ScrollingDirection.Y
-			container.ScrollBarInset = Enum.ScrollBarInset.Always
+			pcall(function()
+				container.ScrollBarInset = Enum.ScrollBarInset.Always
+			end)
 			pcall(function()
 				container.AutomaticCanvasSize = Enum.AutomaticSize.Y
 			end)
