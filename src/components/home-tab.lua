@@ -1014,6 +1014,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			container = scroller
 		end
 
+		local usesAutoCanvas = false
 		if container:IsA("ScrollingFrame") then
 			container.Active = true
 			container.Selectable = true
@@ -1023,9 +1024,10 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			pcall(function()
 				container.ScrollBarInset = Enum.ScrollBarInset.None
 			end)
-			pcall(function()
-				container.AutomaticCanvasSize = Enum.AutomaticSize.None
+			local okAuto = pcall(function()
+				container.AutomaticCanvasSize = Enum.AutomaticSize.Y
 			end)
+			usesAutoCanvas = okAuto == true
 		end
 
 		if dashboardRef and dashboardRef.Parent == detailsHolderRef then
@@ -1056,7 +1058,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		end
 		layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
 
-		if container:IsA("ScrollingFrame") then
+		if container:IsA("ScrollingFrame") and not usesAutoCanvas then
 			local function updateCanvas()
 				local extra = (padding and padding.PaddingBottom.Offset or 0) + 40
 				local y = layout.AbsoluteContentSize.Y + extra
@@ -1086,10 +1088,22 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			titleLabel.Text = "Feedback & Ideas"
 		end
 
-		local content = createContentFrame(card, "FeedbackContent", true)
-		if content and content:IsA("ScrollingFrame") then
-			content.ScrollBarThickness = 0
-			content.ScrollBarImageTransparency = 1
+		local content = createContentFrame(card, "FeedbackContent", false)
+		local contentLayout = content and content:FindFirstChildOfClass("UIListLayout")
+		local contentPadding = content and content:FindFirstChildOfClass("UIPadding")
+		local function updateCardHeight()
+			if not contentLayout then
+				return
+			end
+			local paddingTop = contentPadding and contentPadding.PaddingTop.Offset or 0
+			local paddingBottom = contentPadding and contentPadding.PaddingBottom.Offset or 0
+			local contentHeight = contentLayout.AbsoluteContentSize.Y + paddingTop + paddingBottom
+			local target = math.max(180, contentHeight + 44)
+			card.Size = UDim2.new(1, 0, 0, target)
+		end
+		if contentLayout then
+			updateCardHeight()
+			contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCardHeight)
 		end
 		local fontStrong = Enum.Font.GothamSemibold
 		local fontBody = Enum.Font.Gotham
@@ -1599,20 +1613,36 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		local layout = dashboard:FindFirstChildWhichIsA("UIGridLayout") or dashboard:FindFirstChildWhichIsA("UIListLayout")
 		if layout then
 			layout.SortOrder = Enum.SortOrder.LayoutOrder
+			local function getCardHeight(child)
+				if not (child and child:IsA("GuiObject")) then
+					return 0
+				end
+				if not child.Visible then
+					return 0
+				end
+				if child:IsA("UIGridLayout") or child:IsA("UIListLayout") then
+					return 0
+				end
+				local sizeY = child.Size.Y
+				if sizeY.Scale == 0 and sizeY.Offset > 0 then
+					return sizeY.Offset
+				end
+				return child.AbsoluteSize.Y
+			end
 			local function updateDashboardSize()
 				if layout:IsA("UIGridLayout") then
 					local maxHeight = 0
 					for _, child in ipairs(dashboard:GetChildren()) do
-						if child:IsA("GuiObject") and child.Visible and not child:IsA("UIGridLayout") and not child:IsA("UIListLayout") then
-							local h = child.AbsoluteSize.Y
-							if h > maxHeight then
-								maxHeight = h
-							end
+						local h = getCardHeight(child)
+						if h > maxHeight then
+							maxHeight = h
 						end
 					end
 					if maxHeight > 0 then
 						local cellX = layout.CellSize.X
-						layout.CellSize = UDim2.new(cellX.Scale, cellX.Offset, 0, maxHeight)
+						if layout.CellSize.Y.Scale ~= 0 or layout.CellSize.Y.Offset ~= maxHeight then
+							layout.CellSize = UDim2.new(cellX.Scale, cellX.Offset, 0, maxHeight)
+						end
 					end
 				end
 				local height = layout.AbsoluteContentSize.Y
@@ -1622,6 +1652,19 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 				local x = dashboard.Size.X
 				dashboard.Size = UDim2.new(x.Scale, x.Offset, 0, height + 6)
 			end
+			local function hookChild(child)
+				if not (child and child:IsA("GuiObject")) then
+					return
+				end
+				child:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateDashboardSize)
+				child:GetPropertyChangedSignal("Size"):Connect(updateDashboardSize)
+				child:GetPropertyChangedSignal("Visible"):Connect(updateDashboardSize)
+			end
+			for _, child in ipairs(dashboard:GetChildren()) do
+				hookChild(child)
+			end
+			dashboard.ChildAdded:Connect(hookChild)
+			dashboard.ChildRemoved:Connect(updateDashboardSize)
 			updateDashboardSize()
 			layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateDashboardSize)
 		end
