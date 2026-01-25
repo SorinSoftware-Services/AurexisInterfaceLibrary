@@ -1614,16 +1614,32 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		end
 	end
 
+	if dashboard then
+		dashboard.Visible = true
+	end
+	if not environmentCard and dashboard then
+		local templateCard = feedbackCard or discordCard or clientCard
+		if templateCard then
+			environmentCard = templateCard:Clone()
+			environmentCard.Name = "Server"
+			environmentCard.Parent = dashboard
+		end
+	end
+
 	if environmentCard then
+		environmentCard.Visible = true
 		environmentCard.LayoutOrder = 1
 	end
 	if feedbackCard then
+		feedbackCard.Visible = true
 		feedbackCard.LayoutOrder = 2
 	end
 	if discordCard then
+		discordCard.Visible = true
 		discordCard.LayoutOrder = 3
 	end
 	if clientCard then
+		clientCard.Visible = true
 		clientCard.LayoutOrder = 4
 	end
 
