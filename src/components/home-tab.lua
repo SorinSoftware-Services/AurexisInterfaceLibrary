@@ -1016,13 +1016,15 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 
 		if container:IsA("ScrollingFrame") then
 			container.Active = true
+			container.Selectable = true
 			container.ScrollingEnabled = true
 			container.ScrollingDirection = Enum.ScrollingDirection.Y
+			container.ScrollBarThickness = 6
 			pcall(function()
-				container.ScrollBarInset = Enum.ScrollBarInset.Always
+				container.ScrollBarInset = Enum.ScrollBarInset.None
 			end)
 			pcall(function()
-				container.AutomaticCanvasSize = Enum.AutomaticSize.Y
+				container.AutomaticCanvasSize = Enum.AutomaticSize.None
 			end)
 		end
 
@@ -1034,13 +1036,13 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		if not padding then
 			padding = Instance.new("UIPadding")
 			padding.PaddingLeft = UDim.new(0, 0)
-			padding.PaddingRight = UDim.new(0, 0)
+			padding.PaddingRight = UDim.new(0, 6)
 			padding.PaddingTop = UDim.new(0, 0)
-			padding.PaddingBottom = UDim.new(0, 240)
+			padding.PaddingBottom = UDim.new(0, 280)
 			padding.Parent = container
 		else
-			padding.PaddingRight = UDim.new(0, math.max(padding.PaddingRight.Offset, 0))
-			padding.PaddingBottom = UDim.new(0, math.max(padding.PaddingBottom.Offset, 240))
+			padding.PaddingRight = UDim.new(0, math.max(padding.PaddingRight.Offset, 6))
+			padding.PaddingBottom = UDim.new(0, math.max(padding.PaddingBottom.Offset, 280))
 		end
 
 		local layout = container:FindFirstChildWhichIsA("UIListLayout")
@@ -1052,22 +1054,19 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		else
 			layout.SortOrder = Enum.SortOrder.LayoutOrder
 		end
+		layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
 
 		if container:IsA("ScrollingFrame") then
-			local okAuto = pcall(function()
-				return container.AutomaticCanvasSize
-			end)
-			if not okAuto then
-				local function updateCanvas()
-					local y = layout.AbsoluteContentSize.Y + 240
-					if y < 0 then
-						y = 0
-					end
-					container.CanvasSize = UDim2.new(0, 0, 0, math.min(y, 5000))
+			local function updateCanvas()
+				local extra = (padding and padding.PaddingBottom.Offset or 0) + 40
+				local y = layout.AbsoluteContentSize.Y + extra
+				if y < 0 then
+					y = 0
 				end
-				updateCanvas()
-				layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvas)
+				container.CanvasSize = UDim2.new(0, 0, 0, math.min(y, 6000))
 			end
+			updateCanvas()
+			layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvas)
 		end
 
 		return container, layout
