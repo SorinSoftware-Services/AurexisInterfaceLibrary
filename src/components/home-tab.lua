@@ -4,6 +4,7 @@ local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local Stats = game:GetService("Stats")
+local UserInputService = game:GetService("UserInputService")
 
 
 return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween, Release, isStudio)
@@ -1088,22 +1089,43 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			titleLabel.Text = "Feedback & Ideas"
 		end
 
-		local content = createContentFrame(card, "FeedbackContent", false)
-		local contentLayout = content and content:FindFirstChildOfClass("UIListLayout")
-		local contentPadding = content and content:FindFirstChildOfClass("UIPadding")
-		local function updateCardHeight()
-			if not contentLayout then
-				return
-			end
-			local paddingTop = contentPadding and contentPadding.PaddingTop.Offset or 0
-			local paddingBottom = contentPadding and contentPadding.PaddingBottom.Offset or 0
-			local contentHeight = contentLayout.AbsoluteContentSize.Y + paddingTop + paddingBottom
-			local target = math.max(180, contentHeight + 44)
-			card.Size = UDim2.new(1, 0, 0, target)
+		local allowInnerScroll = UserInputService and UserInputService.TouchEnabled ~= true
+		local content = createContentFrame(card, "FeedbackContent", allowInnerScroll)
+		if content and content:IsA("ScrollingFrame") then
+			content.ScrollBarThickness = 0
+			content.ScrollBarImageTransparency = 1
 		end
-		if contentLayout then
-			updateCardHeight()
-			contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCardHeight)
+
+		local function resolveBaseHeight()
+			local sizeY = card.Size.Y
+			if sizeY.Scale == 0 and sizeY.Offset > 0 then
+				return sizeY.Offset
+			end
+			if card.AbsoluteSize.Y > 0 then
+				return card.AbsoluteSize.Y
+			end
+			return 180
+		end
+
+		if allowInnerScroll then
+			card.Size = UDim2.new(1, 0, 0, resolveBaseHeight())
+		else
+			local contentLayout = content and content:FindFirstChildOfClass("UIListLayout")
+			local contentPadding = content and content:FindFirstChildOfClass("UIPadding")
+			local function updateCardHeight()
+				if not contentLayout then
+					return
+				end
+				local paddingTop = contentPadding and contentPadding.PaddingTop.Offset or 0
+				local paddingBottom = contentPadding and contentPadding.PaddingBottom.Offset or 0
+				local contentHeight = contentLayout.AbsoluteContentSize.Y + paddingTop + paddingBottom
+				local target = math.max(180, contentHeight + 44)
+				card.Size = UDim2.new(1, 0, 0, target)
+			end
+			if contentLayout then
+				updateCardHeight()
+				contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCardHeight)
+			end
 		end
 		local fontStrong = Enum.Font.GothamSemibold
 		local fontBody = Enum.Font.Gotham
