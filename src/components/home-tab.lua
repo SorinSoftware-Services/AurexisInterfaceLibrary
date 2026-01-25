@@ -1089,7 +1089,14 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			titleLabel.Text = "Feedback & Ideas"
 		end
 
-		local allowInnerScroll = UserInputService and UserInputService.TouchEnabled ~= true
+		local isTouch = false
+		if UserInputService then
+			isTouch = UserInputService.TouchEnabled
+			if not isTouch then
+				isTouch = (UserInputService.MouseEnabled == false and UserInputService.KeyboardEnabled == false)
+			end
+		end
+		local allowInnerScroll = not isTouch
 		local content = createContentFrame(card, "FeedbackContent", allowInnerScroll)
 		if content and content:IsA("ScrollingFrame") then
 			content.ScrollBarThickness = 0
@@ -1108,7 +1115,8 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		end
 
 		if allowInnerScroll then
-			card.Size = UDim2.new(1, 0, 0, resolveBaseHeight())
+			local sizeX = card.Size.X
+			card.Size = UDim2.new(sizeX.Scale, sizeX.Offset, 0, resolveBaseHeight())
 		else
 			local contentLayout = content and content:FindFirstChildOfClass("UIListLayout")
 			local contentPadding = content and content:FindFirstChildOfClass("UIPadding")
@@ -1120,7 +1128,8 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 				local paddingBottom = contentPadding and contentPadding.PaddingBottom.Offset or 0
 				local contentHeight = contentLayout.AbsoluteContentSize.Y + paddingTop + paddingBottom
 				local target = math.max(180, contentHeight + 44)
-				card.Size = UDim2.new(1, 0, 0, target)
+				local sizeX = card.Size.X
+				card.Size = UDim2.new(sizeX.Scale, sizeX.Offset, 0, target)
 			end
 			if contentLayout then
 				updateCardHeight()
@@ -1393,7 +1402,8 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			local paddingBottom = contentPadding and contentPadding.PaddingBottom.Offset or 0
 			local contentHeight = contentLayout.AbsoluteContentSize.Y + paddingTop + paddingBottom
 			local target = math.max(220, contentHeight + 44)
-			card.Size = UDim2.new(1, 0, 0, target)
+			local sizeX = card.Size.X
+			card.Size = UDim2.new(sizeX.Scale, sizeX.Offset, 0, target)
 		end
 
 		if contentLayout then
