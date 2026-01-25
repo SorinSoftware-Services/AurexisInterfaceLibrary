@@ -12,9 +12,9 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 
 	HomeTabSettings = Kwargify({
 		Icon = 1,
-		GoodExecutors = {"Krnl", "Delta", "Wave", "Seliware", "Velocity", "Volcano", "MacSploit", "Macsploit", "Bunni", "Hydrogen", "Volt", "Sirhut", "Potassium"},
+		GoodExecutors = {"Bunni", "Delta", "Codex", "ChocoSploit", "Cryptic", "Hydrogen", "MacSploit", "Seliware", "Sirhurt", "Vega X", "Velocity", "Volcano", "Wave", "Volt"},
 		BadExecutors = {"Solara", "Xeno"},
-		DetectedExecutors = {"Swift", "Valex", "Nucleus", "Codex"},
+		DetectedExecutors = {"Swift", "Valex", "Nucleus", "Potassium"},
 		DiscordInvite = "XC5hpQQvMX", -- Only the invite code, not the full URL.
 		Supabase = {
 			url = "https://udnvaneupscmrgwutamv.supabase.co",
@@ -658,30 +658,13 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		return "N/A"
 	end
 
-	local function getTotalMemoryTag()
-		local ok, items = pcall(function()
-			return Enum.DeveloperMemoryTag:GetEnumItems()
-		end)
-		if ok and items then
-			for _, item in ipairs(items) do
-				if item.Name == "Total" then
-					return item
-				end
-			end
-		end
-		return nil
-	end
-
 	local function getMemory()
 		if Stats and typeof(Stats.GetMemoryUsageMbForTag) == "function" then
-			local totalTag = getTotalMemoryTag()
-			if totalTag then
-				local ok, total = pcall(function()
-					return Stats:GetMemoryUsageMbForTag(totalTag)
-				end)
-				if ok and typeof(total) == "number" then
-					return string.format("%.1f MB", total)
-				end
+			local ok, total = pcall(function()
+				return Stats:GetMemoryUsageMbForTag(Enum.DeveloperMemoryTag.Total)
+			end)
+			if ok and typeof(total) == "number" then
+				return string.format("%.1f MB", total)
 			end
 		end
 
