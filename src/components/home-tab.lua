@@ -1038,11 +1038,11 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			padding.PaddingLeft = UDim.new(0, 0)
 			padding.PaddingRight = UDim.new(0, 0)
 			padding.PaddingTop = UDim.new(0, 0)
-			padding.PaddingBottom = UDim.new(0, 280)
+			padding.PaddingBottom = UDim.new(0, 96)
 			padding.Parent = container
 		else
 			padding.PaddingRight = UDim.new(0, math.max(padding.PaddingRight.Offset, 0))
-			padding.PaddingBottom = UDim.new(0, math.max(padding.PaddingBottom.Offset, 280))
+			padding.PaddingBottom = UDim.new(0, math.max(padding.PaddingBottom.Offset, 96))
 		end
 
 		local layout = container:FindFirstChildWhichIsA("UIListLayout")
@@ -1086,7 +1086,23 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 			titleLabel.Text = "Feedback & Ideas"
 		end
 
-		local content = createContentFrame(card, "FeedbackContent", true)
+		local content = createContentFrame(card, "FeedbackContent", false)
+		local contentLayout = content and content:FindFirstChildOfClass("UIListLayout")
+		local contentPadding = content and content:FindFirstChildOfClass("UIPadding")
+		local function updateCardHeight()
+			if not contentLayout then
+				return
+			end
+			local paddingTop = contentPadding and contentPadding.PaddingTop.Offset or 0
+			local paddingBottom = contentPadding and contentPadding.PaddingBottom.Offset or 0
+			local contentHeight = contentLayout.AbsoluteContentSize.Y + paddingTop + paddingBottom
+			local target = math.max(180, contentHeight + 44)
+			card.Size = UDim2.new(1, 0, 0, target)
+		end
+		if contentLayout then
+			updateCardHeight()
+			contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCardHeight)
+		end
 		local fontStrong = Enum.Font.GothamSemibold
 		local fontBody = Enum.Font.Gotham
 
@@ -1595,6 +1611,16 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		local layout = dashboard:FindFirstChildWhichIsA("UIGridLayout") or dashboard:FindFirstChildWhichIsA("UIListLayout")
 		if layout then
 			layout.SortOrder = Enum.SortOrder.LayoutOrder
+			local function updateDashboardSize()
+				local height = layout.AbsoluteContentSize.Y
+				if height < 0 then
+					height = 0
+				end
+				local x = dashboard.Size.X
+				dashboard.Size = UDim2.new(x.Scale, x.Offset, 0, height + 6)
+			end
+			updateDashboardSize()
+			layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateDashboardSize)
 		end
 	end
 
