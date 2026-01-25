@@ -12,13 +12,13 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 
 	HomeTabSettings = Kwargify({
 		Icon = 1,
-		GoodExecutors = {"Bunni", "Delta", "Codex", "ChocoSploit", "Cryptic", "Hydrogen", "MacSploit", "Seliware", "Sirhurt", "Vega X", "Velocity", "Volcano", "Wave", "Volt"},
+		GoodExecutors = {"Bunni", "Delta", "Codex", "ChocoSploit", "Cryptic", "Hydrogen", "MacSploit", "Seliware", "SirHurt", "Vega X", "Velocity", "Volcano", "Wave", "Volt"},
 		BadExecutors = {"Solara", "Xeno"},
 		DetectedExecutors = {"Swift", "Valex", "Nucleus", "Potassium"},
 		DiscordInvite = "XC5hpQQvMX", -- Only the invite code, not the full URL.
 		Supabase = {
-			url = "",
-			anonKey = "",
+			url = "https://udnvaneupscmrgwutamv.supabase.co",
+			anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkbnZhbmV1cHNjbXJnd3V0YW12Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ1NjEyMzAsImV4cCI6MjA3MDEzNzIzMH0.7duKofEtgRarIYDAoMfN7OEkOI_zgkG2WzAXZlxl5J0",
 			feedbackFunction = "submit_feedback",
 		},
 	}, HomeTabSettings or {})
