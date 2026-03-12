@@ -1,4 +1,4 @@
--- src/services/notification.lua
+-- src/services/notification.lua - 12.03.26
 return function(Aurexis, Kwargify, BlurModule, TweenService, Notifications)
 	function Aurexis:Notification(data)
 		task.spawn(function()
@@ -17,7 +17,7 @@ return function(Aurexis, Kwargify, BlurModule, TweenService, Notifications)
 			BlurModule(newNotification)
 
 			newNotification.Title.Text = data.Title
-			newNotification.Description.Text = data.Content 
+			newNotification.Description.Text = data.Content
 			newNotification.Icon.Image = Aurexis:GetIcon(data.Icon, data.ImageSource)
 			newNotification.Description.TextWrapped = true
 
@@ -28,6 +28,21 @@ return function(Aurexis, Kwargify, BlurModule, TweenService, Notifications)
 			newNotification.Shadow.ImageTransparency = 1
 			newNotification.Icon.ImageTransparency = 1
 			newNotification.Icon.BackgroundTransparency = 1
+
+			-- X close button (top-right corner)
+			local closeBtn = Instance.new("TextButton")
+			closeBtn.Name = "CloseButton"
+			closeBtn.Text = "✕"
+			closeBtn.Size = UDim2.new(0, 28, 0, 28)
+			closeBtn.Position = UDim2.new(1, -32, 0, 4)
+			closeBtn.AnchorPoint = Vector2.new(0, 0)
+			closeBtn.BackgroundTransparency = 1
+			closeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+			closeBtn.TextSize = 13
+			closeBtn.Font = Enum.Font.GothamBold
+			closeBtn.ZIndex = newNotification.ZIndex + 2
+			closeBtn.TextTransparency = 1
+			closeBtn.Parent = newNotification
 
 			task.wait()
 
@@ -52,20 +67,57 @@ return function(Aurexis, Kwargify, BlurModule, TweenService, Notifications)
 			TweenService:Create(newNotification.Description, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0.35}):Play()
 			TweenService:Create(newNotification.UIStroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Transparency = 0.95}):Play()
 			TweenService:Create(newNotification.Shadow, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 0.82}):Play()
+			TweenService:Create(closeBtn, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0.4}):Play()
+
+			-- Shared dismiss function — used by timer, X button, and swipe
+			local dismissed = false
+			local function dismiss()
+				if dismissed then return end
+				dismissed = true
+				TweenService:Create(newNotification, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
+				TweenService:Create(newNotification.UIStroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
+				TweenService:Create(newNotification.Shadow, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
+				TweenService:Create(newNotification.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+				TweenService:Create(newNotification.Description, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+				TweenService:Create(newNotification.Icon, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
+				TweenService:Create(closeBtn, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+				TweenService:Create(newNotification, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Size = UDim2.new(1, -90, 0, 0)}):Play()
+				task.wait(1)
+				if newNotification and newNotification.Parent then
+					newNotification:Destroy()
+				end
+			end
+
+			-- X button click
+			closeBtn.MouseButton1Click:Connect(dismiss)
+
+			-- Swipe right to dismiss (touch)
+			local touchStartX = nil
+			local swipeDeltaX = 0
+			newNotification.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.Touch then
+					touchStartX = input.Position.X
+					swipeDeltaX = 0
+				end
+			end)
+			newNotification.InputChanged:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.Touch and touchStartX then
+					swipeDeltaX = input.Position.X - touchStartX
+				end
+			end)
+			newNotification.InputEnded:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.Touch and touchStartX then
+					if swipeDeltaX > 60 then
+						dismiss()
+					end
+					touchStartX = nil
+					swipeDeltaX = 0
+				end
+			end)
 
 			local waitDuration = math.min(math.max((#newNotification.Description.Text * 0.1) + 2.5, 3), 10)
 			task.wait(data.Duration or waitDuration)
-
-			TweenService:Create(newNotification, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-			TweenService:Create(newNotification.UIStroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-			TweenService:Create(newNotification.Shadow, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
-			TweenService:Create(newNotification.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-			TweenService:Create(newNotification.Description, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-			TweenService:Create(newNotification.Icon, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
-			TweenService:Create(newNotification, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Size = UDim2.new(1, -90, 0, 0)}):Play()
-			
-			task.wait(1)
-			newNotification:Destroy()
+			dismiss()
 		end)
 	end
 end
