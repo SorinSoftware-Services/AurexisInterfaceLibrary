@@ -1,4 +1,4 @@
--- src/services/notification.lua - 12.03.26
+-- src/services/notification.lua
 return function(Aurexis, Kwargify, BlurModule, TweenService, Notifications)
 	function Aurexis:Notification(data)
 		task.spawn(function()
@@ -29,19 +29,26 @@ return function(Aurexis, Kwargify, BlurModule, TweenService, Notifications)
 			newNotification.Icon.ImageTransparency = 1
 			newNotification.Icon.BackgroundTransparency = 1
 
-			-- X close button (top-right corner)
-			local closeBtn = Instance.new("TextButton")
+			-- close icon button (top-right corner)
+			local closeBtn = Instance.new("ImageButton")
 			closeBtn.Name = "CloseButton"
-			closeBtn.Text = "✕"
-			closeBtn.Size = UDim2.new(0, 28, 0, 28)
-			closeBtn.Position = UDim2.new(1, -32, 0, 4)
+			closeBtn.Size = UDim2.new(0, 20, 0, 20)
+			closeBtn.Position = UDim2.new(1, -26, 0, 6)
 			closeBtn.AnchorPoint = Vector2.new(0, 0)
 			closeBtn.BackgroundTransparency = 1
-			closeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-			closeBtn.TextSize = 13
-			closeBtn.Font = Enum.Font.GothamBold
+			closeBtn.ImageColor3 = Color3.fromRGB(200, 200, 200)
+			closeBtn.ImageTransparency = 1
 			closeBtn.ZIndex = newNotification.ZIndex + 2
-			closeBtn.TextTransparency = 1
+			do
+				local iconResult = Aurexis:GetIcon("close", "Material")
+				if typeof(iconResult) == "table" and iconResult.id then
+					closeBtn.Image = "rbxassetid://" .. iconResult.id
+					closeBtn.ImageRectSize = iconResult.imageRectSize
+					closeBtn.ImageRectOffset = iconResult.imageRectOffset
+				else
+					closeBtn.Image = iconResult or ""
+				end
+			end
 			closeBtn.Parent = newNotification
 
 			task.wait()
@@ -67,7 +74,7 @@ return function(Aurexis, Kwargify, BlurModule, TweenService, Notifications)
 			TweenService:Create(newNotification.Description, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0.35}):Play()
 			TweenService:Create(newNotification.UIStroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Transparency = 0.95}):Play()
 			TweenService:Create(newNotification.Shadow, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 0.82}):Play()
-			TweenService:Create(closeBtn, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0.4}):Play()
+			TweenService:Create(closeBtn, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 0.4}):Play()
 
 			-- Shared dismiss function — used by timer, X button, and swipe
 			local dismissed = false
@@ -80,7 +87,7 @@ return function(Aurexis, Kwargify, BlurModule, TweenService, Notifications)
 				TweenService:Create(newNotification.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
 				TweenService:Create(newNotification.Description, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
 				TweenService:Create(newNotification.Icon, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
-				TweenService:Create(closeBtn, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+				TweenService:Create(closeBtn, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
 				TweenService:Create(newNotification, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Size = UDim2.new(1, -90, 0, 0)}):Play()
 				task.wait(1)
 				if newNotification and newNotification.Parent then
