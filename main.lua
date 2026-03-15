@@ -36,16 +36,16 @@ by Nebula Softworks
 
 local BASE_URL = "https://raw.githubusercontent.com/SorinSoftware-Services/AurexisInterfaceLibrary/main/"
 
-local Release = "v 1.1.0"
+local Release = " Version 1.1.0"
 
 local Aurexis = { 
 	Folder = "AurexisLibrary UI", 
 	Options = {}, 
 	AllowEnvironmentBlur = true,
 	ThemeGradient = ColorSequence.new{
-		ColorSequenceKeypoint.new(0.00, Color3.fromRGB(173, 216, 255)), -- baby blue
-		ColorSequenceKeypoint.new(0.50, Color3.fromRGB(100, 149, 237)), -- medium blue
-		ColorSequenceKeypoint.new(1.00, Color3.fromRGB(195, 144, 255))  -- lilac
+		ColorSequenceKeypoint.new(0.00, Color3.fromRGB(173, 216, 255)),
+		ColorSequenceKeypoint.new(0.50, Color3.fromRGB(100, 149, 237)),
+		ColorSequenceKeypoint.new(1.00, Color3.fromRGB(195, 144, 255))
 	} 
 }
 
@@ -114,11 +114,11 @@ local function keyCodeLabel(key)
 end
 
 local compatibilityPlaces = {
-	[16389395869] = true, -- a dusty trip
+	[0] = false,
 }
 
 local compatibilityUniverses = {
-	[5650396773] = true, -- a dusty trip universe
+	[5650396773] = true, -- a dusty trip
 	[3989869156] = true, -- ANTS WAR
 	[111958650] = true,  -- Arsenal
 	[7848646653] = true, -- Break your Bones
@@ -131,23 +131,21 @@ if compatibilityPlaces[game.PlaceId] or compatibilityUniverses[game.GameId] then
 end
 
 local isStudio
-local website = "https://scripts.sorinservice.online"
+local website = "https://sorinsoftware.services"
 
 if RunService:IsStudio() then
 	isStudio = true
 end
 
--- On touch devices, disable heavy environment blur by default
 if UserInputService.TouchEnabled and not isStudio then
 	Aurexis.AllowEnvironmentBlur = false
 end
 
 
--- Universal remote require helper
+
 local function requireRemote(path)
 	local ok, result = pcall(function()
 		local body = game:HttpGet(BASE_URL .. path)
-		-- sanitize potential invisible Unicode characters from remote code
 		local replacements = {
 			{ string.char(0xC2, 0xA0), " " },      -- NBSP -> space
 			{ string.char(0xE2, 0x80, 0x8B), "" }, -- ZWSP
@@ -169,14 +167,13 @@ local function requireRemote(path)
 	end
 end
 
--- Load Icon Module
 local IconModule = requireRemote("src/icons.lua")
 
--- Toggle key service (for loaders / consumers)
+
 local ToggleKeyService = requireRemote("src/services/toggle_key.lua")
 Aurexis.ToggleKeyService = ToggleKeyService
 
--- Other Variables
+
 local request = (syn and syn.request) or (http and http.request) or http_request or nil
 local tweeninfo = TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 local PresetGradients = {
@@ -231,9 +228,9 @@ function Aurexis:GetIcon(icon, source)
 	else	
 		if icon ~= nil and IconModule[source] then
 			local sourceicon = IconModule[source]
-			return sourceicon[icon]
+			return sourceicon[icon] or ""
 		else
-			return nil
+			return ""
 		end
 	end
 end
@@ -788,7 +785,7 @@ local AurexisUI = isStudio and script.Parent:WaitForChild("Aurexis UI") or game:
 local SizeBleh = nil
 local mainWindowFrame = nil
 
--- Helper to prevent camera movement on mobile while the main window is open
+-- Helper to prevent camera movement on mobile
 local MOBILE_BLOCK_ACTION = "Aurexis_BlockMobileTouch"
 local function setMobileInputBlocked(block)
 	if not UserInputService.TouchEnabled or isStudio then
@@ -1411,13 +1408,11 @@ local function Draggable(Bar, Window, enableTaptic, tapticOffset)
 	end)
 end
 
----------------------------------------------------------------- -- Notification START
+-- Notification
 
 local NotificationService = requireRemote("src/services/notification.lua")
 NotificationService(Aurexis, Kwargify, BlurModule, TweenService, Notifications)
 
-
----------------------------------------------------------------- -- Notification END
 
 local function Unhide(Window, currentTab)
 	Window.Size = SizeBleh
@@ -1487,11 +1482,11 @@ local function computeWindowSizes()
 	local viewportSize = Camera and Camera.ViewportSize or Vector2.new(1280, 720)
 
 	if viewportSize.X > 774 and viewportSize.Y > 503 then
-		-- Desktop / larger screens: keep original default window size
+		-- Desktop
 		MainSize = UDim2.fromOffset(675, 424)
 		MinSize = UDim2.fromOffset(500, 42)
 	else
-		-- Smaller / mobile screens: use dynamic padding instead of fixed offsets
+		-- Mobile
 		local widthPadding = math.clamp(math.floor(viewportSize.X * 0.10), 40, 140)
 		local heightPadding = math.clamp(math.floor(viewportSize.Y * 0.14), 40, 140)
 
@@ -1558,7 +1553,7 @@ function Aurexis:CreateWindow(WindowSettings)
 	WindowSettings.KeySettings.SecondAction = Kwargify({
 		Enabled = false,
 		Type = "Discord", -- Link/Discord
-		Parameter = "" -- for discord, add the invite link like home tab. for link, type the link of ur key sys
+		Parameter = "SPd67BHa6u" -- for discord, add the invite link like home tab. for link, type the link of ur key sys
 	}, WindowSettings.KeySettings.SecondAction)
 
 	local Passthrough = false
@@ -1843,11 +1838,10 @@ function Aurexis:CreateWindow(WindowSettings)
 	Draggable(AurexisUI.MobileSupport, AurexisUI.MobileSupport)
 	if dragBar then Draggable(dragInteract, Main, true, 255) end
 
-	-- Recalculate window size when orientation / viewport changes
+	-- Recalculate window size when orientation change
 	local function updateWindowSizeForViewport()
 		computeWindowSizes()
 		if Window.Size then
-			-- minimized
 			Main.Size = MinSize
 		else
 			Main.Size = MainSize
@@ -1859,7 +1853,7 @@ function Aurexis:CreateWindow(WindowSettings)
 		Camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateWindowSizeForViewport)
 	end
 
-	-- Block camera movement on mobile while main window is open
+	-- Block camera movement on mobile when window is open
 	setMobileInputBlocked(true)
 
 	Elements.Template.LayoutOrder = 1000000000
@@ -1869,21 +1863,30 @@ function Aurexis:CreateWindow(WindowSettings)
 
 	local FirstTab = true
 
----------------------------------------------------------------- -- HomeTab START
-	
--- HomeTab laden und registrieren
+-- HomeTab START
 local HomeTabModule = requireRemote("src/components/home-tab.lua")
 local attachSectionControls = requireRemote("src/components/section-controls.lua")
 local attachTabControls = requireRemote("src/components/tab-controls.lua")
-HomeTabModule(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween, Release, isStudio)
+local homeTabOk, homeTabErr = pcall(function()
+	if type(HomeTabModule) == "function" then
+		HomeTabModule(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween, Release, isStudio)
+	end
+end)
+if not homeTabOk then
+	warn("[Aurexis] HomeTab module failed to load:", homeTabErr)
+end
 
--- HomeTab jetzt ERSTELLEN (sonst bleibt alles leer)
-Window:CreateHomeTab()
+
+if type(Window.CreateHomeTab) == "function" then
+	Window:CreateHomeTab()
+else
+	warn("[Aurexis] CreateHomeTab missing - Home tab skipped.")
+end
 
 FirstTab = false
 
----------------------------------------------------------------- -- HomeTab END
--- Stolen From Sirius Stuff ends here
+-- HomeTab END
+
 
 	function Window:CreateTab(TabSettings)
 
@@ -2396,12 +2399,17 @@ FirstTab = false
 
 	UserInputService.InputBegan:Connect(function(input, gpe)
 		if gpe then return end
-		if Window.State then return end
 		if input.KeyCode == Window.Bind then
-			Unhide(Main, Window.CurrentTab)
-			AurexisUI.MobileSupport.Visible = false
-			dragBar.Visible = true
-			Window.State = true
+			if Window.State then
+				-- Window is open → close it
+				collapseWindow(false)
+			else
+				-- Window is hidden → open it
+				Unhide(Main, Window.CurrentTab)
+				AurexisUI.MobileSupport.Visible = false
+				dragBar.Visible = true
+				Window.State = true
+			end
 		end
 	end)
 
