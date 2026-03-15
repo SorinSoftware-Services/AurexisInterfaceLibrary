@@ -70,27 +70,13 @@ local function attachSectionControls(ctx)
 		end
 
 		Button.Interact["MouseButton1Click"]:Connect(function()
-			local Success,Response = pcall(ButtonSettings.Callback)
-
-			if not Success then
-				TweenService:Create(Button, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-				TweenService:Create(Button, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
-				TweenService:Create(Button.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-				Button.Title.Text = "Callback Error"
-				print("Aurexis Interface Library | "..ButtonSettings.Name.." Callback Error " ..tostring(Response))
-				wait(0.5)
-				Button.Title.Text = ButtonSettings.Name
-				TweenService:Create(Button, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-				TweenService:Create(Button, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(32, 30, 38)}):Play()
-				TweenService:Create(Button.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
+			task.spawn(ButtonSettings.Callback)
+			tween(Button.UIStroke, {Color = Color3.fromRGB(136, 131, 163)})
+			task.wait(0.2)
+			if ButtonV.Hover then
+				tween(Button.UIStroke, {Color = Color3.fromRGB(87, 84, 104)})
 			else
-				tween(Button.UIStroke, {Color = Color3.fromRGB(136, 131, 163)})
-				wait(0.2)
-				if ButtonV.Hover then
-					tween(Button.UIStroke, {Color = Color3.fromRGB(87, 84, 104)})
-				else
-					tween(Button.UIStroke, {Color = Color3.fromRGB(64,61,76)})
-				end
+				tween(Button.UIStroke, {Color = Color3.fromRGB(64,61,76)})
 			end
 		end)
 
@@ -357,7 +343,6 @@ local function attachSectionControls(ctx)
 
 						SliderSettings.CurrentValue = NewValue
 						SliderV.CurrentValue = SliderSettings.CurrentValue
-						-- Aurexis.Flags[SliderSettings.Flag] = SliderSettings
 					end
 				else
 					TweenService:Create(Slider.Main.Progress, TweenInfo.new(0.1, Enum.EasingStyle.Back, Enum.EasingDirection.In, 0, false), {Size = UDim2.new(0, Location - Slider.Main.AbsolutePosition.X > 5 and Location - Slider.Main.AbsolutePosition.X or 5, 1, 0)}):Play()
@@ -390,7 +375,6 @@ local function attachSectionControls(ctx)
 
 			SliderSettings.CurrentValue = NewVal
 			SliderV.CurrentValue = SliderSettings.CurrentValue
-			-- Aurexis.Flags[SliderSettings.Flag] = SliderSettings
 
 		end
 
@@ -424,8 +408,6 @@ local function attachSectionControls(ctx)
 			Slider.Title.Text = SliderSettings.Name
 
 			Set()
-
-			-- Aurexis.Flags[SliderSettings.Flag] = SliderSettings
 		end
 
 		function SliderV:Destroy()
@@ -632,15 +614,11 @@ local function attachSectionControls(ctx)
 			Name = "Bind",
 			Description = nil,
 			CurrentBind = "Q",
-			HoldToInteract = false, -- setting this makes the Bind in toggle mode
+			HoldToInteract = false,
 			Callback = function(Bind)
-				-- The function that takes place when the Bind is pressed
-				-- The variable (Bind) is a boolean for whether the Bind is being held or not (HoldToInteract needs to be true) or whether the Bind is currently active
 			end,
 
 			OnChangedCallback = function(Bind)
-				-- The function that takes place when the binded key changes
-				-- The variable (Bind) is a Enum.KeyCode for the new Binded Key
 			end,
 		}, BindSettings or {})
 
@@ -837,8 +815,6 @@ local function attachSectionControls(ctx)
 			Aurexis.Options[Flag] = BindV
 		end
 
-		-- Aurexis.Flags[BindSettings.Flag] = BindSettings
-
 		return BindV
 
 	end
@@ -1027,10 +1003,8 @@ local function attachSectionControls(ctx)
 			Options = {"Option 1", "Option 2"},
 			CurrentOption = {"Option 1"},
 			MultipleOptions = false,
-			SpecialType = nil, -- currently onl player, might add more soon
+			SpecialType = nil,
 			Callback = function(Options)
-				-- The function that takes place when the selected option is changed
-				-- The variable (Options) is a table of strings for the current selected options or a string if multioptions is false
 			end,
 		}, DropdownSettings or {})
 
@@ -1349,9 +1323,6 @@ local function attachSectionControls(ctx)
 				Dropdown.Selected.PlaceholderText = DropdownSettings.CurrentOption[1] or "None"
 			end
 			Dropdown.Selected.Text = ""
-
-			-- Aurexis.Flags[DropdownSettings.Flag] = DropdownSettings
-
 		end
 
 		function DropdownV:Destroy()
@@ -1362,8 +1333,6 @@ local function attachSectionControls(ctx)
 		if Flag then
 			Aurexis.Options[Flag] = DropdownV
 		end
-
-		-- Aurexis.Flags[DropdownSettings.Flag] = DropdownSettings
 
 		return DropdownV
 
