@@ -1532,7 +1532,8 @@ function Aurexis:CreateWindow(WindowSettings)
 
 		KeySystem = false,
 		KeySettings = {},
-		ToggleKey = Enum.KeyCode.K
+		ToggleKey = Enum.KeyCode.K,
+		HomeTab = true
 	}, WindowSettings or {})
 
 	WindowSettings.ConfigSettings = Kwargify({
@@ -1864,23 +1865,25 @@ function Aurexis:CreateWindow(WindowSettings)
 	local FirstTab = true
 
 -- HomeTab START
-local HomeTabModule = requireRemote("src/components/home-tab.lua")
 local attachSectionControls = requireRemote("src/components/section-controls.lua")
 local attachTabControls = requireRemote("src/components/tab-controls.lua")
-local homeTabOk, homeTabErr = pcall(function()
-	if type(HomeTabModule) == "function" then
-		HomeTabModule(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween, Release, isStudio)
+
+if WindowSettings.HomeTab ~= false then
+	local HomeTabModule = requireRemote("src/components/home-tab.lua")
+	local homeTabOk, homeTabErr = pcall(function()
+		if type(HomeTabModule) == "function" then
+			HomeTabModule(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween, Release, isStudio)
+		end
+	end)
+	if not homeTabOk then
+		warn("[Aurexis] HomeTab module failed to load:", homeTabErr)
 	end
-end)
-if not homeTabOk then
-	warn("[Aurexis] HomeTab module failed to load:", homeTabErr)
-end
 
-
-if type(Window.CreateHomeTab) == "function" then
-	Window:CreateHomeTab()
-else
-	warn("[Aurexis] CreateHomeTab missing - Home tab skipped.")
+	if type(Window.CreateHomeTab) == "function" then
+		Window:CreateHomeTab()
+	else
+		warn("[Aurexis] CreateHomeTab missing - Home tab skipped.")
+	end
 end
 
 FirstTab = false
