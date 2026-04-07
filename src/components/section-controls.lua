@@ -70,6 +70,9 @@ local function attachSectionControls(ctx)
 		end
 
 		Button.Interact["MouseButton1Click"]:Connect(function()
+			-- task.spawn instead of pcall: pcall + any yielding call (HttpGet, request)
+			-- crashes on Xeno with "cannot resume running coroutine". Callbacks handle
+			-- their own error reporting via Aurexis:Notification.
 			task.spawn(ButtonSettings.Callback)
 			tween(Button.UIStroke, {Color = Color3.fromRGB(136, 131, 163)})
 			task.wait(0.2)
@@ -343,6 +346,7 @@ local function attachSectionControls(ctx)
 
 						SliderSettings.CurrentValue = NewValue
 						SliderV.CurrentValue = SliderSettings.CurrentValue
+						-- Aurexis.Flags[SliderSettings.Flag] = SliderSettings
 					end
 				else
 					TweenService:Create(Slider.Main.Progress, TweenInfo.new(0.1, Enum.EasingStyle.Back, Enum.EasingDirection.In, 0, false), {Size = UDim2.new(0, Location - Slider.Main.AbsolutePosition.X > 5 and Location - Slider.Main.AbsolutePosition.X or 5, 1, 0)}):Play()
@@ -375,6 +379,7 @@ local function attachSectionControls(ctx)
 
 			SliderSettings.CurrentValue = NewVal
 			SliderV.CurrentValue = SliderSettings.CurrentValue
+			-- Aurexis.Flags[SliderSettings.Flag] = SliderSettings
 
 		end
 
@@ -408,6 +413,8 @@ local function attachSectionControls(ctx)
 			Slider.Title.Text = SliderSettings.Name
 
 			Set()
+
+			-- Aurexis.Flags[SliderSettings.Flag] = SliderSettings
 		end
 
 		function SliderV:Destroy()
@@ -614,11 +621,15 @@ local function attachSectionControls(ctx)
 			Name = "Bind",
 			Description = nil,
 			CurrentBind = "Q",
-			HoldToInteract = false,
+			HoldToInteract = false, -- setting this makes the Bind in toggle mode
 			Callback = function(Bind)
+				-- The function that takes place when the Bind is pressed
+				-- The variable (Bind) is a boolean for whether the Bind is being held or not (HoldToInteract needs to be true) or whether the Bind is currently active
 			end,
 
 			OnChangedCallback = function(Bind)
+				-- The function that takes place when the binded key changes
+				-- The variable (Bind) is a Enum.KeyCode for the new Binded Key
 			end,
 		}, BindSettings or {})
 
@@ -705,7 +716,7 @@ local function attachSectionControls(ctx)
 					end
 					Bind.BindFrame.BindBox:ReleaseFocus()
 				end
-			elseif BindSettings.CurrentBind ~= nil and (input.KeyCode == Enum.KeyCode[BindSettings.CurrentBind] and not processed) then -- Test
+			elseif BindSettings.CurrentBind ~= nil and (function() local ok,kc = pcall(function() return Enum.KeyCode[BindSettings.CurrentBind] end) return ok and kc~=nil and input.KeyCode==kc end)() and not processed then -- Test
 				local Held = true
 				local Connection
 				Connection = input.Changed:Connect(function(prop)
@@ -814,6 +825,8 @@ local function attachSectionControls(ctx)
 		if Flag then
 			Aurexis.Options[Flag] = BindV
 		end
+
+		-- Aurexis.Flags[BindSettings.Flag] = BindSettings
 
 		return BindV
 
@@ -1003,8 +1016,10 @@ local function attachSectionControls(ctx)
 			Options = {"Option 1", "Option 2"},
 			CurrentOption = {"Option 1"},
 			MultipleOptions = false,
-			SpecialType = nil,
+			SpecialType = nil, -- currently onl player, might add more soon
 			Callback = function(Options)
+				-- The function that takes place when the selected option is changed
+				-- The variable (Options) is a table of strings for the current selected options or a string if multioptions is false
 			end,
 		}, DropdownSettings or {})
 
@@ -1323,6 +1338,9 @@ local function attachSectionControls(ctx)
 				Dropdown.Selected.PlaceholderText = DropdownSettings.CurrentOption[1] or "None"
 			end
 			Dropdown.Selected.Text = ""
+
+			-- Aurexis.Flags[DropdownSettings.Flag] = DropdownSettings
+
 		end
 
 		function DropdownV:Destroy()
@@ -1333,6 +1351,8 @@ local function attachSectionControls(ctx)
 		if Flag then
 			Aurexis.Options[Flag] = DropdownV
 		end
+
+		-- Aurexis.Flags[DropdownSettings.Flag] = DropdownSettings
 
 		return DropdownV
 
