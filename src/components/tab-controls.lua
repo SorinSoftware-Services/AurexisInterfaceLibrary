@@ -706,6 +706,7 @@ function Tab:CreateBind(BindSettings, Flag)
 				local NewKeyNoEnum = SplitMessage[3]
 				Bind.BindFrame.BindBox.Text = tostring(NewKeyNoEnum)
 				BindSettings.CurrentBind = tostring(NewKeyNoEnum)
+				BindV.CurrentBind = BindSettings.CurrentBind
 				local Success, Response = pcall(function()
 					BindSettings.Callback(BindSettings.CurrentBind)
 				end)
@@ -723,7 +724,7 @@ function Tab:CreateBind(BindSettings, Flag)
 				end
 				Bind.BindFrame.BindBox:ReleaseFocus()
 			end
-		elseif BindSettings.CurrentBind ~= nil and (input.KeyCode == Enum.KeyCode[BindSettings.CurrentBind] and not processed) then -- Test
+		elseif BindSettings.CurrentBind ~= nil and BindSettings.CurrentBind ~= "None" and BindSettings.CurrentBind ~= "" and (function() local ok,kc = pcall(function() return Enum.KeyCode[BindSettings.CurrentBind] end) return ok and kc~=nil and input.KeyCode==kc end)() and not processed then
 			local Held = true
 			local Connection
 			Connection = input.Changed:Connect(function(prop)
@@ -921,7 +922,7 @@ function Tab:CreateKeybind(BindSettings)
 				BindSettings.CurrentBind = tostring(NewKeyNoEnum)
 				Bind.BindFrame.BindBox:ReleaseFocus()
 			end
-		elseif BindSettings.CurrentBind ~= nil and (input.KeyCode == Enum.KeyCode[BindSettings.CurrentBind] and not processed) then -- Test
+		elseif BindSettings.CurrentBind ~= nil and BindSettings.CurrentBind ~= "None" and BindSettings.CurrentBind ~= "" and (function() local ok,kc = pcall(function() return Enum.KeyCode[BindSettings.CurrentBind] end) return ok and kc~=nil and input.KeyCode==kc end)() and not processed then
 			local Held = true
 			local Connection
 			Connection = input.Changed:Connect(function(prop)
