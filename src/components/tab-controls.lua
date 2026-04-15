@@ -686,8 +686,8 @@ function Tab:CreateBind(BindSettings, Flag)
 
 	Bind.BindFrame.BindBox.FocusLost:Connect(function()
 		CheckingForKey = false
-		if Bind.BindFrame.BindBox.Text == (nil or "") then
-			Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
+		if Bind.BindFrame.BindBox.Text == "" then
+			Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind ~= nil and BindSettings.CurrentBind ~= "" and BindSettings.CurrentBind or "None"
 		end
 	end)
 
@@ -701,7 +701,15 @@ function Tab:CreateBind(BindSettings, Flag)
 	UserInputService.InputBegan:Connect(function(input, processed)
 
 		if CheckingForKey then
-			if input.KeyCode ~= Enum.KeyCode.Unknown and input.KeyCode ~= Window.Bind then
+			if input.KeyCode == Enum.KeyCode.Delete or input.KeyCode == Enum.KeyCode.Backspace then
+				BindSettings.CurrentBind = "None"
+				BindV.CurrentBind = "None"
+				Bind.BindFrame.BindBox.Text = "None"
+				pcall(function()
+					BindSettings.OnChangedCallback(nil)
+				end)
+				Bind.BindFrame.BindBox:ReleaseFocus()
+			elseif input.KeyCode ~= Enum.KeyCode.Unknown and input.KeyCode ~= Window.Bind then
 				local SplitMessage = string.split(tostring(input.KeyCode), ".")
 				local NewKeyNoEnum = SplitMessage[3]
 				Bind.BindFrame.BindBox.Text = tostring(NewKeyNoEnum)
@@ -900,8 +908,8 @@ function Tab:CreateKeybind(BindSettings)
 
 	Bind.BindFrame.BindBox.FocusLost:Connect(function()
 		CheckingForKey = false
-		if Bind.BindFrame.BindBox.Text == (nil or "") then
-			Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
+		if Bind.BindFrame.BindBox.Text == "" then
+			Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind ~= nil and BindSettings.CurrentBind ~= "" and BindSettings.CurrentBind or "None"
 		end
 	end)
 
@@ -915,7 +923,15 @@ function Tab:CreateKeybind(BindSettings)
 	UserInputService.InputBegan:Connect(function(input, processed)
 
 		if CheckingForKey then
-			if input.KeyCode ~= Enum.KeyCode.Unknown and input.KeyCode ~= Enum.KeyCode.K then
+			if input.KeyCode == Enum.KeyCode.Delete or input.KeyCode == Enum.KeyCode.Backspace then
+				BindSettings.CurrentBind = "None"
+				BindV.CurrentBind = "None"
+				Bind.BindFrame.BindBox.Text = "None"
+				pcall(function()
+					BindSettings.OnChangedCallback(nil)
+				end)
+				Bind.BindFrame.BindBox:ReleaseFocus()
+			elseif input.KeyCode ~= Enum.KeyCode.Unknown and input.KeyCode ~= Enum.KeyCode.K then
 				local SplitMessage = string.split(tostring(input.KeyCode), ".")
 				local NewKeyNoEnum = SplitMessage[3]
 				Bind.BindFrame.BindBox.Text = tostring(NewKeyNoEnum)
