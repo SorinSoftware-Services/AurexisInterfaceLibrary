@@ -21,15 +21,17 @@ return function(Aurexis, Kwargify, BlurModule, TweenService, Notifications)
 			newNotification.Icon.Image = Aurexis:GetIcon(data.Icon, data.ImageSource)
 			newNotification.Description.TextWrapped = true
 
+			local stroke = newNotification:FindFirstChild("UIStroke")
+
 			newNotification.BackgroundTransparency = 1
 			newNotification.Title.TextTransparency = 1
 			newNotification.Description.TextTransparency = 1
-			newNotification.UIStroke.Transparency = 1
+			if stroke then stroke.Transparency = 1 end
 			newNotification.Shadow.ImageTransparency = 1
 			newNotification.Icon.ImageTransparency = 1
 			newNotification.Icon.BackgroundTransparency = 1
 
-			-- close icon button (top-right corner)
+			-- close icon button
 			local closeBtn = Instance.new("ImageButton")
 			closeBtn.Name = "CloseButton"
 			closeBtn.Size = UDim2.new(0, 20, 0, 20)
@@ -72,17 +74,16 @@ return function(Aurexis, Kwargify, BlurModule, TweenService, Notifications)
 			TweenService:Create(newNotification.Icon, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
 			task.wait(0.05)
 			TweenService:Create(newNotification.Description, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0.35}):Play()
-			TweenService:Create(newNotification.UIStroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Transparency = 0.95}):Play()
+			if stroke then TweenService:Create(stroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Transparency = 0.95}):Play() end
 			TweenService:Create(newNotification.Shadow, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 0.82}):Play()
 			TweenService:Create(closeBtn, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 0.4}):Play()
 
-			-- Shared dismiss function — used by timer, X button, and swipe
 			local dismissed = false
 			local function dismiss()
 				if dismissed then return end
 				dismissed = true
 				TweenService:Create(newNotification, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-				TweenService:Create(newNotification.UIStroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
+				if stroke then TweenService:Create(stroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Transparency = 1}):Play() end
 				TweenService:Create(newNotification.Shadow, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
 				TweenService:Create(newNotification.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
 				TweenService:Create(newNotification.Description, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
@@ -95,10 +96,8 @@ return function(Aurexis, Kwargify, BlurModule, TweenService, Notifications)
 				end
 			end
 
-			-- X button click
 			closeBtn.MouseButton1Click:Connect(dismiss)
 
-			-- Swipe right to dismiss (touch)
 			local touchStartX = nil
 			local swipeDeltaX = 0
 			newNotification.InputBegan:Connect(function(input)
