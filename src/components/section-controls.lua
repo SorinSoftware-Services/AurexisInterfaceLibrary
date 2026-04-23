@@ -671,7 +671,12 @@ local function attachSectionControls(ctx)
 
 
 		Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
-		Bind.BindFrame.BindBox.Size = UDim2.new(0, Bind.BindFrame.BindBox.TextBounds.X + 20, 0, 42)
+		Bind.BindFrame.BindBox.AutomaticSize = Enum.AutomaticSize.X
+		task.defer(function()
+			local w = math.max(Bind.BindFrame.BindBox.TextBounds.X + 20, 50)
+			Bind.BindFrame.BindBox.Size = UDim2.new(0, w, 0, 42)
+			Bind.BindFrame.Size = UDim2.new(0, w, 0, 30)
+		end)
 
 		Bind.BindFrame.BindBox.Focused:Connect(function()
 			CheckingForKey = true
@@ -812,7 +817,10 @@ local function attachSectionControls(ctx)
 			end
 
 			Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
-			Bind.BindFrame.Size = UDim2.new(0, Bind.BindFrame.BindBox.TextBounds.X + 20, 0, 42)
+			task.defer(function()
+				local w = math.max(Bind.BindFrame.BindBox.TextBounds.X + 20, 50)
+				Bind.BindFrame.Size = UDim2.new(0, w, 0, 42)
+			end)
 
 
 			BindV.CurrentBind = BindSettings.CurrentBind
