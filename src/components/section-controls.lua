@@ -467,20 +467,10 @@ local function attachSectionControls(ctx)
 		if ToggleSettings.Description ~= nil and ToggleSettings.Description ~= "" then
 			Toggle.Desc.Text = ToggleSettings.Description
 			Toggle.Desc.TextWrapped = true
-			-- Calculate needed height using TextService (no rendering needed)
-			pcall(function()
-				local descWidth = Toggle.Desc.AbsoluteSize.X
-				if descWidth < 10 then descWidth = 300 end -- fallback
-				local descSize = TextService:GetTextSize(
-					ToggleSettings.Description,
-					Toggle.Desc.TextSize,
-					Toggle.Desc.Font,
-					Vector2.new(descWidth, math.huge)
-				)
-				local titleH = 16
-				local newH = math.max(titleH + descSize.Y + 22, 50)
-				Toggle.Size = UDim2.new(1, 0, 0, newH)
-			end)
+			-- Same trick as Paragraph:Update() — set height to huge to force TextBounds calculation
+			Toggle.Desc.Size = UDim2.new(Toggle.Desc.Size.X.Scale, Toggle.Desc.Size.X.Offset, 0, math.huge)
+			Toggle.Desc.Size = UDim2.new(Toggle.Desc.Size.X.Scale, Toggle.Desc.Size.X.Offset, 0, Toggle.Desc.TextBounds.Y)
+			Toggle.Size = UDim2.new(1, 0, 0, math.max(Toggle.Desc.TextBounds.Y + Toggle.Title.TextBounds.Y + 20, 50))
 		end
 
 		Toggle.UIStroke.Transparency = 1
