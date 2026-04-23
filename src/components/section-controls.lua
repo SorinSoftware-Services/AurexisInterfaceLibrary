@@ -465,8 +465,13 @@ local function attachSectionControls(ctx)
 		if ToggleSettings.Description ~= nil and ToggleSettings.Description ~= "" then
 			Toggle.Desc.Text = ToggleSettings.Description
 			Toggle.Desc.TextWrapped = true
-			Toggle.Desc.AutomaticSize = Enum.AutomaticSize.Y
-			Toggle.AutomaticSize = Enum.AutomaticSize.Y
+			Toggle.Desc:GetPropertyChangedSignal("TextBounds"):Connect(function()
+				local titleH = Toggle.Title.TextBounds.Y
+				local descH = Toggle.Desc.TextBounds.Y
+				if descH > 0 then
+					Toggle.Size = UDim2.new(1, 0, 0, math.max(titleH + descH + 20, 50))
+				end
+			end)
 		end
 
 		Toggle.UIStroke.Transparency = 1
@@ -673,9 +678,13 @@ local function attachSectionControls(ctx)
 		TweenService:Create(Bind.BindFrame.BindBox, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 
 
+		local function resizeBindFrame()
+			local w = math.max(Bind.BindFrame.BindBox.TextBounds.X + 20, 50)
+			Bind.BindFrame.Size = UDim2.new(0, w, 0, 30)
+			Bind.BindFrame.BindBox.Size = UDim2.new(0, w, 0, 42)
+		end
+		Bind.BindFrame.BindBox:GetPropertyChangedSignal("TextBounds"):Connect(resizeBindFrame)
 		Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
-		Bind.BindFrame.BindBox.AutomaticSize = Enum.AutomaticSize.X
-		Bind.BindFrame.AutomaticSize = Enum.AutomaticSize.X
 
 		Bind.BindFrame.BindBox.Focused:Connect(function()
 			CheckingForKey = true
@@ -792,8 +801,6 @@ local function attachSectionControls(ctx)
 			end
 		end)
 
-		-- AutomaticSize handles BindFrame sizing now
-
 		function BindV:Set(NewBindSettings)
 
 			NewBindSettings = Kwargify({
@@ -814,7 +821,6 @@ local function attachSectionControls(ctx)
 			end
 
 			Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
-			-- AutomaticSize handles BindFrame sizing
 
 			BindV.CurrentBind = BindSettings.CurrentBind
 		end
