@@ -467,10 +467,14 @@ local function attachSectionControls(ctx)
 		if ToggleSettings.Description ~= nil and ToggleSettings.Description ~= "" then
 			Toggle.Desc.Text = ToggleSettings.Description
 			Toggle.Desc.TextWrapped = true
-			-- Same trick as Paragraph:Update() — set height to huge to force TextBounds calculation
-			Toggle.Desc.Size = UDim2.new(Toggle.Desc.Size.X.Scale, Toggle.Desc.Size.X.Offset, 0, math.huge)
-			Toggle.Desc.Size = UDim2.new(Toggle.Desc.Size.X.Scale, Toggle.Desc.Size.X.Offset, 0, Toggle.Desc.TextBounds.Y)
-			Toggle.Size = UDim2.new(1, 0, 0, math.max(Toggle.Desc.TextBounds.Y + Toggle.Title.TextBounds.Y + 20, 50))
+			Toggle.ClipsDescendants = false
+			-- Paragraph trick: huge height → forces TextBounds to calculate wrapped text
+			Toggle.Desc.Size = UDim2.new(1, -50, 0, math.huge)
+			Toggle.Desc.Size = UDim2.new(1, -50, 0, Toggle.Desc.TextBounds.Y)
+			Toggle.Desc.Position = UDim2.new(0, 10, 0, 25)
+			-- Resize frame: title(23) + gap + desc + padding
+			local totalH = math.max(25 + Toggle.Desc.TextBounds.Y + 12, 48)
+			Toggle.Size = UDim2.new(1, -25, 0, totalH)
 		end
 
 		Toggle.UIStroke.Transparency = 1
