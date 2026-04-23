@@ -643,6 +643,7 @@ local function attachSectionControls(ctx)
 		end
 
 		Bind.Visible = true
+		Bind.ClipsDescendants = false
 		Bind.Parent = TabPage
 
 		Bind.Name = BindSettings.Name
