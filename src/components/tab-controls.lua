@@ -9,6 +9,7 @@ local function attachTabControls(ctx)
 	local RemoveTable = ctx.RemoveTable
 	local unpackt = ctx.unpackt
 	local Aurexis = ctx.Aurexis
+	Aurexis._connections = Aurexis._connections or {}
 	local AurexisUI = ctx.AurexisUI
 	local Window = ctx.Window
 	local tween = ctx.tween
