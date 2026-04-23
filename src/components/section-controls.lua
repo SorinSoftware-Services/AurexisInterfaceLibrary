@@ -691,7 +691,7 @@ local function attachSectionControls(ctx)
 		Bind["MouseLeave"]:Connect(function()
 			tween(Bind.UIStroke, {Color = Color3.fromRGB(64,61,76)})
 		end)
-		UserInputService.InputBegan:Connect(function(input, processed)
+		table.insert(Aurexis._connections, UserInputService.InputBegan:Connect(function(input, processed)
 
 			if CheckingForKey then
 				if input.KeyCode ~= Enum.KeyCode.Unknown and input.KeyCode ~= Window.Bind then
@@ -785,7 +785,7 @@ local function attachSectionControls(ctx)
 					end
 				end
 			end
-		end)
+		end))
 
 		Bind.BindFrame.BindBox:GetPropertyChangedSignal("Text"):Connect(function()
 			TweenService:Create(Bind.BindFrame, TweenInfo.new(0.55, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(0, Bind.BindFrame.BindBox.TextBounds.X + 20, 0, 30)}):Play()
@@ -1442,10 +1442,10 @@ local function attachSectionControls(ctx)
 				tween(Display, {BackgroundTransparency = 0})
 			end
 		end)
-		UserInputService.InputEnded:Connect(function(input, gameProcessed) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+		table.insert(Aurexis._connections, UserInputService.InputEnded:Connect(function(input, gameProcessed) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
 				mainDragging = false
 				sliderDragging = false
-			end end)
+			end end))
 		Main.MouseButton1Down:Connect(function()
 			if opened then
 				mainDragging = true 
