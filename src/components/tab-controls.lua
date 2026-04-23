@@ -9,7 +9,6 @@ local function attachTabControls(ctx)
 	local RemoveTable = ctx.RemoveTable
 	local unpackt = ctx.unpackt
 	local Aurexis = ctx.Aurexis
-	Aurexis._connections = Aurexis._connections or {}
 	local AurexisUI = ctx.AurexisUI
 	local Window = ctx.Window
 	local tween = ctx.tween
@@ -19,6 +18,7 @@ local function attachTabControls(ctx)
 	local HttpService = ctx.HttpService
 	local isStudio = ctx.isStudio
 
+	-- Divider
 	function Tab:CreateDivider()
 		local b = Elements.Template.Divider:Clone()
 		b.Parent = TabPage
@@ -26,6 +26,7 @@ local function attachTabControls(ctx)
 		tween(b.Line, {BackgroundTransparency = 0})
 	end
 
+-- Button
 function Tab:CreateButton(ButtonSettings)
 
 	ButtonSettings = Kwargify({
@@ -40,6 +41,7 @@ function Tab:CreateButton(ButtonSettings)
 		Hover = false,
 		Settings = ButtonSettings
 	}
+
 
 	local Button
 	if ButtonSettings.Description == nil and ButtonSettings.Description ~= "" then
@@ -128,6 +130,7 @@ function Tab:CreateButton(ButtonSettings)
 	return ButtonV
 end
 
+-- Label
 function Tab:CreateLabel(LabelSettings)
 
 	local LabelV = {}
@@ -181,6 +184,7 @@ function Tab:CreateLabel(LabelSettings)
 	return LabelV
 end
 
+-- Paragraph
 function Tab:CreateParagraph(ParagraphSettings)
 
 	ParagraphSettings = Kwargify({
@@ -246,6 +250,7 @@ function Tab:CreateParagraph(ParagraphSettings)
 	return ParagraphV
 end
 
+-- Slider
 function Tab:CreateSlider(SliderSettings, Flag)
 	local SliderV = { IgnoreConfig = false, Class = "Slider", Settings = SliderSettings }
 
@@ -353,6 +358,7 @@ function Tab:CreateSlider(SliderSettings, Flag)
 
 					SliderSettings.CurrentValue = NewValue
 					SliderV.CurrentValue = SliderSettings.CurrentValue
+					-- Aurexis.Flags[SliderSettings.Flag] = SliderSettings
 				end
 			else
 				TweenService:Create(Slider.Main.Progress, TweenInfo.new(0.1, Enum.EasingStyle.Back, Enum.EasingDirection.In, 0, false), {Size = UDim2.new(0, Location - Slider.Main.AbsolutePosition.X > 5 and Location - Slider.Main.AbsolutePosition.X or 5, 1, 0)}):Play()
@@ -385,6 +391,7 @@ function Tab:CreateSlider(SliderSettings, Flag)
 
 		SliderSettings.CurrentValue = NewVal
 		SliderV.CurrentValue = SliderSettings.CurrentValue
+		-- Aurexis.Flags[SliderSettings.Flag] = SliderSettings
 
 	end
 
@@ -419,6 +426,7 @@ function Tab:CreateSlider(SliderSettings, Flag)
 
 		Set()
 
+		-- Aurexis.Flags[SliderSettings.Flag] = SliderSettings
 	end
 
 	function SliderV:Destroy()
@@ -439,6 +447,7 @@ function Tab:CreateSlider(SliderSettings, Flag)
 
 end
 
+-- Toggle
 function Tab:CreateToggle(ToggleSettings, Flag)    
 	local ToggleV = { IgnoreConfig = false, Class = "Toggle" }
 
@@ -449,6 +458,7 @@ function Tab:CreateToggle(ToggleSettings, Flag)
 		Callback = function(Value)
 		end,
 	}, ToggleSettings or {})
+
 
 	local Toggle
 
@@ -613,6 +623,7 @@ function Tab:CreateToggle(ToggleSettings, Flag)
 
 end
 
+-- Bind
 function Tab:CreateBind(BindSettings, Flag)
 	local BindV = { Class = "Keybind", IgnoreConfig = false, Settings = BindSettings, Active = false }
 
@@ -620,11 +631,15 @@ function Tab:CreateBind(BindSettings, Flag)
 		Name = "Bind",
 		Description = nil,
 		CurrentBind = "Q",
-		HoldToInteract = false,
+		HoldToInteract = false, -- setting this makes the Bind in toggle mode
 		Callback = function(Bind)
+			-- The function that takes place when the Bind is pressed
+			-- The variable (Bind) is a boolean for whether the Bind is being held or not (HoldToInteract needs to be true) or whether the Bind is currently active
 		end,
 
 		OnChangedCallback = function(Bind)
+			-- The function that takes place when the binded key changes
+			-- The variable (Bind) is a Enum.KeyCode for the new Binded Key
 		end,
 	}, BindSettings or {})
 
@@ -663,6 +678,7 @@ function Tab:CreateBind(BindSettings, Flag)
 	TweenService:Create(Bind.BindFrame.UIStroke, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {Transparency = 0.3}):Play()
 	TweenService:Create(Bind.BindFrame.BindBox, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 
+
 	Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
 	Bind.BindFrame.BindBox.Size = UDim2.new(0, Bind.BindFrame.BindBox.TextBounds.X + 20, 0, 42)
 
@@ -685,7 +701,7 @@ function Tab:CreateBind(BindSettings, Flag)
 	Bind["MouseLeave"]:Connect(function()
 		tween(Bind.UIStroke, {Color = Color3.fromRGB(64,61,76)})
 	end)
-	table.insert(Aurexis._connections, UserInputService.InputBegan:Connect(function(input, processed)
+	UserInputService.InputBegan:Connect(function(input, processed)
 
 		if CheckingForKey then
 			if input.KeyCode == Enum.KeyCode.Delete or input.KeyCode == Enum.KeyCode.Backspace then
@@ -788,7 +804,7 @@ function Tab:CreateBind(BindSettings, Flag)
 				end
 			end
 		end
-	end))
+	end)
 
 	Bind.BindFrame.BindBox:GetPropertyChangedSignal("Text"):Connect(function()
 		TweenService:Create(Bind.BindFrame, TweenInfo.new(0.55, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(0, Bind.BindFrame.BindBox.TextBounds.X + 20, 0, 30)}):Play()
@@ -816,6 +832,7 @@ function Tab:CreateBind(BindSettings, Flag)
 		Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
 		Bind.BindFrame.Size = UDim2.new(0, Bind.BindFrame.BindBox.TextBounds.X + 20, 0, 42)
 
+
 		BindV.CurrentBind = BindSettings.CurrentBind
 	end
 
@@ -828,6 +845,8 @@ function Tab:CreateBind(BindSettings, Flag)
 		Aurexis.Options[Flag] = BindV
 	end
 
+	-- Aurexis.Flags[BindSettings.Flag] = BindSettings
+
 	return BindV
 
 end
@@ -838,8 +857,10 @@ function Tab:CreateKeybind(BindSettings)
 		Name = "Bind",
 		Description = nil,
 		CurrentBind = "Q",
-		HoldToInteract = false,
+		HoldToInteract = false, -- setting this makes the Bind in toggle mode
 		Callback = function(Bind)
+			-- The function that takes place when the Bind is pressed
+			-- The variable (Bind) is a boolean for whether the Bind is being held or not (HoldToInteract needs to be true) or whether the Bind is currently active
 		end
 	}, BindSettings or {})
 
@@ -879,6 +900,7 @@ function Tab:CreateKeybind(BindSettings)
 	TweenService:Create(Bind.BindFrame.UIStroke, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {Transparency = 0.3}):Play()
 	TweenService:Create(Bind.BindFrame.BindBox, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 
+
 	Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
 	Bind.BindFrame.BindBox.Size = UDim2.new(0, Bind.BindFrame.BindBox.TextBounds.X + 16, 0, 42)
 
@@ -901,7 +923,7 @@ function Tab:CreateKeybind(BindSettings)
 	Bind["MouseLeave"]:Connect(function()
 		tween(Bind.UIStroke, {Color = Color3.fromRGB(64,61,76)})
 	end)
-	table.insert(Aurexis._connections, UserInputService.InputBegan:Connect(function(input, processed)
+	UserInputService.InputBegan:Connect(function(input, processed)
 
 		if CheckingForKey then
 			if input.KeyCode == Enum.KeyCode.Delete or input.KeyCode == Enum.KeyCode.Backspace then
@@ -988,7 +1010,7 @@ function Tab:CreateKeybind(BindSettings)
 				end
 			end
 		end
-	end))
+	end)
 
 	Bind.BindFrame.BindBox:GetPropertyChangedSignal("Text"):Connect(function()
 		TweenService:Create(Bind.BindFrame, TweenInfo.new(0.55, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(0, Bind.BindFrame.BindBox.TextBounds.X + 16, 0, 30)}):Play()
@@ -1016,6 +1038,8 @@ function Tab:CreateKeybind(BindSettings)
 		Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
 		Bind.BindFrame.BindBox.Size = UDim2.new(0, Bind.BindFrame.BindBox.TextBounds.X + 16, 0, 42)
 
+		-- Aurexis.Flags[BindSettings.Flag] = BindSettings
+
 	end
 
 	function BindV:Destroy()
@@ -1023,10 +1047,13 @@ function Tab:CreateKeybind(BindSettings)
 		Bind:Destroy()
 	end
 
+	-- Aurexis.Flags[BindSettings.Flag] = BindSettings
+
 	return BindV
 
 end
 
+-- Dynamic Input
 function Tab:CreateInput(InputSettings, Flag)
 	local InputV = { IgnoreConfig = false, Class = "Input", Settings = InputSettings }
 
@@ -1041,7 +1068,7 @@ function Tab:CreateInput(InputSettings, Flag)
 		MaxCharacters = nil,
 		Callback = function(Text)
 
-		end,
+		end, -- 52
 	}, InputSettings or {})
 
 	InputV.CurrentValue = InputSettings.CurrentValue
@@ -1162,6 +1189,7 @@ function Tab:CreateInput(InputSettings, Flag)
 		Input.Visible = isVisible and true or false
 	end
 
+
 	function InputV:Set(NewInputSettings)
 
 		NewInputSettings = Kwargify(InputSettings, NewInputSettings or {})
@@ -1192,10 +1220,12 @@ function Tab:CreateInput(InputSettings, Flag)
 		Aurexis.Options[Flag] = InputV
 	end
 
+
 	return InputV
 
 end
 
+-- Dropdown
 function Tab:CreateDropdown(DropdownSettings, Flag)
 	local DropdownV = { IgnoreConfig = false, Class = "Dropdown", Settings = DropdownSettings}
 
@@ -1205,8 +1235,10 @@ function Tab:CreateDropdown(DropdownSettings, Flag)
 		Options = {"Option 1", "Option 2"},
 		CurrentOption = {"Option 1"},
 		MultipleOptions = false,
-		SpecialType = nil,
+		SpecialType = nil, -- currently onl player, might add more soon
 		Callback = function(Options)
+			-- The function that takes place when the selected option is changed
+			-- The variable (Options) is a table of strings for the current selected options or a string if multioptions is false
 		end,
 	}, DropdownSettings or {})
 
@@ -1269,6 +1301,7 @@ function Tab:CreateDropdown(DropdownSettings, Flag)
 		end
 	end
 
+	-- fixed by justhey
 	Dropdown.Selected:GetPropertyChangedSignal("Text"):Connect(function()
 		local text = Dropdown.Selected.Text:lower()
 		for _, Item in ipairs(Dropdown.List:GetChildren()) do
@@ -1277,6 +1310,7 @@ function Tab:CreateDropdown(DropdownSettings, Flag)
 			end
 		end
 	end)
+
 
 	local function Clear()
 		for _, option in ipairs(Dropdown.List:GetChildren()) do
@@ -1524,6 +1558,8 @@ function Tab:CreateDropdown(DropdownSettings, Flag)
 		end
 		Dropdown.Selected.Text = ""
 
+		-- Aurexis.Flags[DropdownSettings.Flag] = DropdownSettings
+
 	end
 
 	function DropdownV:Destroy()
@@ -1535,17 +1571,22 @@ function Tab:CreateDropdown(DropdownSettings, Flag)
 		Aurexis.Options[Flag] = DropdownV
 	end
 
+	-- Aurexis.Flags[DropdownSettings.Flag] = DropdownSettings
+
 	return DropdownV
 
 end
 
-function Tab:CreateColorPicker(ColorPickerSettings, Flag)
+-- Color Picker
+function Tab:CreateColorPicker(ColorPickerSettings, Flag) -- by Rayfield/Throit
 	local ColorPickerV = {IgnoreClass = false, Class = "Colorpicker", Settings = ColorPickerSettings}
 
 	ColorPickerSettings = Kwargify({
 		Name = "Color Picker",
 		Color = Color3.fromRGB(255,255,255),
 		Callback = function(Value)
+			-- The function that takes place every time the color picker is moved/changed
+			-- The variable (Value) is a Color3fromRGB value based on which color is selected
 		end
 	}, ColorPickerSettings or {})
 
@@ -1619,10 +1660,10 @@ function Tab:CreateColorPicker(ColorPickerSettings, Flag)
 			tween(Display, {BackgroundTransparency = 0})
 		end
 	end)
-	table.insert(Aurexis._connections, UserInputService.InputEnded:Connect(function(input, gameProcessed) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+	UserInputService.InputEnded:Connect(function(input, gameProcessed) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
 			mainDragging = false
 			sliderDragging = false
-		end end))
+		end end)
 	Main.MouseButton1Down:Connect(function()
 		if opened then
 			mainDragging = true 
@@ -1645,10 +1686,12 @@ function Tab:CreateColorPicker(ColorPickerSettings, Flag)
 	local hex = string.format("#%02X%02X%02X",color.R*0xFF,color.G*0xFF,color.B*0xFF)
 	ColorPicker.HexInput.InputBox.Text = hex
 	local function setDisplay(hp,sp,vp)
+		--Main
 		Main.MainPoint.Position = UDim2.new(s,-Main.MainPoint.AbsoluteSize.X/2,1-v,-Main.MainPoint.AbsoluteSize.Y/2)
 		Main.MainPoint.ImageColor3 = Color3.fromHSV(hp,sp,vp)
 		Background.BackgroundColor3 = Color3.fromHSV(hp,1,1)
 		Display.BackgroundColor3 = Color3.fromHSV(hp,sp,vp)
+		--Slider 
 		local x = hp * Slider.AbsoluteSize.X
 		Slider.SliderPoint.Position = UDim2.new(0,x-Slider.SliderPoint.AbsoluteSize.X/2,0.5,0)
 		Slider.SliderPoint.ImageColor3 = Color3.fromHSV(hp,1,1)
@@ -1677,6 +1720,7 @@ function Tab:CreateColorPicker(ColorPickerSettings, Flag)
 		ColorPickerSettings.Color = Color3.fromRGB(r,g,b)
 		SafeCallback( Color3.fromRGB(r,g,b))
 	end)
+	--RGB
 	local function rgbBoxes(box,toChange)
 		local value = tonumber(box.Text) 
 		local color = Color3.fromHSV(h,s,v) 
@@ -1780,6 +1824,7 @@ function Tab:CreateColorPicker(ColorPickerSettings, Flag)
 	return ColorPickerV
 end
 
+
 function Tab:BuildConfigSection()
 	if isStudio then
 		Tab:CreateLabel({Text = "Config system unavailable. (Environment isStudio)", Style = 3})
@@ -1849,6 +1894,7 @@ function Tab:BuildConfigSection()
 	})
 
 	Tab:CreateSection("Config Load/Settings")
+
 
 	configSelection = Tab:CreateDropdown({
 		Name = "Select Config",
@@ -2021,6 +2067,7 @@ local ClassParser = {
 			end
 		end
 	},
+	-- buggy as hell stil
 	["Colorpicker"] = {
 		Save = function(Flag, data)
 			local function Color3ToHex(color)
@@ -2049,6 +2096,7 @@ local ClassParser = {
 	}
 }
 
+
 function Tab:BuildThemeSection()
 
 	local Title = Elements.Template.Title:Clone()
@@ -2063,7 +2111,7 @@ function Tab:BuildThemeSection()
 	local c1cp = Tab:CreateColorPicker({
 		Name = "Color 1",
 		Color = Color3.fromRGB(0, 255, 204),
-	}, "AurexisInterfaceSuitePrebuiltCPC1")
+	}, "AurexisInterfaceSuitePrebuiltCPC1") -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
 
 	local c2cp = Tab:CreateColorPicker({
 		Name = "Color 2",
@@ -2118,6 +2166,7 @@ function Tab:BuildThemeSection()
 	end
 
 end
+
 
 local function BuildFolderTree()
 	if isStudio then return "Config system unavailable." end
