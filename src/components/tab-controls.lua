@@ -653,6 +653,7 @@ function Tab:CreateBind(BindSettings, Flag)
 	end
 
 	Bind.Visible = true
+	Bind.ClipsDescendants = false
 	Bind.Parent = TabPage
 
 	Bind.Name = BindSettings.Name
@@ -875,6 +876,7 @@ function Tab:CreateKeybind(BindSettings)
 	end
 
 	Bind.Visible = true
+	Bind.ClipsDescendants = false
 	Bind.Parent = TabPage
 
 	Bind.Name = BindSettings.Name
