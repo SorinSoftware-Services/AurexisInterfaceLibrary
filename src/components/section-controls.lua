@@ -465,18 +465,8 @@ local function attachSectionControls(ctx)
 		if ToggleSettings.Description ~= nil and ToggleSettings.Description ~= "" then
 			Toggle.Desc.Text = ToggleSettings.Description
 			Toggle.Desc.TextWrapped = true
-			-- Auto-resize frame height to fit description
-			task.spawn(function()
-				for _ = 1, 10 do
-					if Toggle.Desc.TextBounds.Y > 0 then break end
-					RunService.RenderStepped:Wait()
-				end
-				local titleH = Toggle.Title.TextBounds.Y
-				local descH = Toggle.Desc.TextBounds.Y
-				local minH = 50
-				local newH = math.max(titleH + descH + 20, minH)
-				Toggle.Size = UDim2.new(1, 0, 0, newH)
-			end)
+			Toggle.Desc.AutomaticSize = Enum.AutomaticSize.Y
+			Toggle.AutomaticSize = Enum.AutomaticSize.Y
 		end
 
 		Toggle.UIStroke.Transparency = 1
@@ -684,17 +674,8 @@ local function attachSectionControls(ctx)
 
 
 		Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
-		task.spawn(function()
-			-- Wait for TextBounds to update (may take a few frames after parenting)
-			local box = Bind.BindFrame.BindBox
-			for _ = 1, 10 do
-				if box.TextBounds.X > 0 then break end
-				RunService.RenderStepped:Wait()
-			end
-			local w = math.max(box.TextBounds.X + 20, 50)
-			box.Size = UDim2.new(0, w, 0, 42)
-			Bind.BindFrame.Size = UDim2.new(0, w, 0, 30)
-		end)
+		Bind.BindFrame.BindBox.AutomaticSize = Enum.AutomaticSize.X
+		Bind.BindFrame.AutomaticSize = Enum.AutomaticSize.X
 
 		Bind.BindFrame.BindBox.Focused:Connect(function()
 			CheckingForKey = true
@@ -811,17 +792,7 @@ local function attachSectionControls(ctx)
 			end
 		end)
 
-		Bind.BindFrame.BindBox:GetPropertyChangedSignal("Text"):Connect(function()
-			task.spawn(function()
-				local box = Bind.BindFrame.BindBox
-				for _ = 1, 5 do
-					if box.TextBounds.X > 0 then break end
-					RunService.RenderStepped:Wait()
-				end
-				local w = math.max(box.TextBounds.X + 20, 50)
-				TweenService:Create(Bind.BindFrame, TweenInfo.new(0.55, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(0, w, 0, 30)}):Play()
-			end)
-		end)
+		-- AutomaticSize handles BindFrame sizing now
 
 		function BindV:Set(NewBindSettings)
 
@@ -843,16 +814,7 @@ local function attachSectionControls(ctx)
 			end
 
 			Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
-			task.spawn(function()
-				local box = Bind.BindFrame.BindBox
-				for _ = 1, 10 do
-					if box.TextBounds.X > 0 then break end
-					RunService.RenderStepped:Wait()
-				end
-				local w = math.max(box.TextBounds.X + 20, 50)
-				Bind.BindFrame.Size = UDim2.new(0, w, 0, 42)
-			end)
-
+			-- AutomaticSize handles BindFrame sizing
 
 			BindV.CurrentBind = BindSettings.CurrentBind
 		end
