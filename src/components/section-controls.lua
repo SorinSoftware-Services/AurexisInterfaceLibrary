@@ -1,3 +1,5 @@
+local TextService = game:GetService("TextService")
+
 local function attachSectionControls(ctx)
 	local Section = ctx.Section
 	local TabPage = ctx.TabPage
@@ -465,12 +467,19 @@ local function attachSectionControls(ctx)
 		if ToggleSettings.Description ~= nil and ToggleSettings.Description ~= "" then
 			Toggle.Desc.Text = ToggleSettings.Description
 			Toggle.Desc.TextWrapped = true
-			Toggle.Desc:GetPropertyChangedSignal("TextBounds"):Connect(function()
-				local titleH = Toggle.Title.TextBounds.Y
-				local descH = Toggle.Desc.TextBounds.Y
-				if descH > 0 then
-					Toggle.Size = UDim2.new(1, 0, 0, math.max(titleH + descH + 20, 50))
-				end
+			-- Calculate needed height using TextService (no rendering needed)
+			pcall(function()
+				local descWidth = Toggle.Desc.AbsoluteSize.X
+				if descWidth < 10 then descWidth = 300 end -- fallback
+				local descSize = TextService:GetTextSize(
+					ToggleSettings.Description,
+					Toggle.Desc.TextSize,
+					Toggle.Desc.Font,
+					Vector2.new(descWidth, math.huge)
+				)
+				local titleH = 16
+				local newH = math.max(titleH + descSize.Y + 22, 50)
+				Toggle.Size = UDim2.new(1, 0, 0, newH)
 			end)
 		end
 
@@ -678,13 +687,26 @@ local function attachSectionControls(ctx)
 		TweenService:Create(Bind.BindFrame.BindBox, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 
 
+		local function measureBindText(text)
+			local box = Bind.BindFrame.BindBox
+			local ok, size = pcall(function()
+				return TextService:GetTextSize(text, box.TextSize, box.Font, Vector2.new(math.huge, math.huge))
+			end)
+			if ok and size then
+				return math.max(size.X + 20, 50)
+			end
+			return math.max(#text * 8 + 20, 50) -- fallback: rough estimate
+		end
+
 		local function resizeBindFrame()
-			local w = math.max(Bind.BindFrame.BindBox.TextBounds.X + 20, 50)
+			local w = measureBindText(Bind.BindFrame.BindBox.Text)
 			Bind.BindFrame.Size = UDim2.new(0, w, 0, 30)
 			Bind.BindFrame.BindBox.Size = UDim2.new(0, w, 0, 42)
 		end
-		Bind.BindFrame.BindBox:GetPropertyChangedSignal("TextBounds"):Connect(resizeBindFrame)
+
 		Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
+		resizeBindFrame()
+		Bind.BindFrame.BindBox:GetPropertyChangedSignal("Text"):Connect(resizeBindFrame)
 
 		Bind.BindFrame.BindBox.Focused:Connect(function()
 			CheckingForKey = true
