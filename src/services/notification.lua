@@ -22,12 +22,13 @@ return function(Aurexis, Kwargify, BlurModule, TweenService, Notifications)
 			newNotification.Description.TextWrapped = true
 
 			local stroke = newNotification:FindFirstChild("UIStroke")
+			local shadow = newNotification:FindFirstChild("Shadow")
 
 			newNotification.BackgroundTransparency = 1
 			newNotification.Title.TextTransparency = 1
 			newNotification.Description.TextTransparency = 1
 			if stroke then stroke.Transparency = 1 end
-			newNotification.Shadow.ImageTransparency = 1
+			if shadow then shadow.ImageTransparency = 1 end
 			newNotification.Icon.ImageTransparency = 1
 			newNotification.Icon.BackgroundTransparency = 1
 
@@ -75,7 +76,7 @@ return function(Aurexis, Kwargify, BlurModule, TweenService, Notifications)
 			task.wait(0.05)
 			TweenService:Create(newNotification.Description, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 0.35}):Play()
 			if stroke then TweenService:Create(stroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Transparency = 0.95}):Play() end
-			TweenService:Create(newNotification.Shadow, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 0.82}):Play()
+			if shadow then TweenService:Create(shadow, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 0.82}):Play() end
 			TweenService:Create(closeBtn, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 0.4}):Play()
 
 			local dismissed = false
@@ -84,7 +85,7 @@ return function(Aurexis, Kwargify, BlurModule, TweenService, Notifications)
 				dismissed = true
 				TweenService:Create(newNotification, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
 				if stroke then TweenService:Create(stroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Transparency = 1}):Play() end
-				TweenService:Create(newNotification.Shadow, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
+				if shadow then TweenService:Create(shadow, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play() end
 				TweenService:Create(newNotification.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
 				TweenService:Create(newNotification.Description, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
 				TweenService:Create(newNotification.Icon, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
