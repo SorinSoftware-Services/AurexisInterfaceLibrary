@@ -1,7 +1,9 @@
 -- src/services/notification.lua
 return function(Aurexis, Kwargify, BlurModule, TweenService, Notifications)
 	function Aurexis:Notification(data)
+		if Aurexis._destroyed then return end
 		task.spawn(function()
+			if Aurexis._destroyed then return end
 			data = Kwargify({
 				Title = "Missing Title",
 				Content = "Missing or Unknown Content",
@@ -81,8 +83,9 @@ return function(Aurexis, Kwargify, BlurModule, TweenService, Notifications)
 
 			local dismissed = false
 			local function dismiss()
-				if dismissed then return end
+				if dismissed or Aurexis._destroyed then return end
 				dismissed = true
+				if not newNotification or not newNotification.Parent then return end
 				TweenService:Create(newNotification, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
 				if stroke then TweenService:Create(stroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Transparency = 1}):Play() end
 				if shadow then TweenService:Create(shadow, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play() end
