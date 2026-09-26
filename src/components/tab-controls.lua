@@ -279,12 +279,22 @@ function Tab:CreateSlider(SliderSettings, Flag)
 	TweenService:Create(Slider.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
 	TweenService:Create(Slider.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()	
 
-	Slider.Main.Progress.Size =	UDim2.new(0, Slider.Main.AbsoluteSize.X * ((SliderSettings.CurrentValue + SliderSettings.Range[1]) / (SliderSettings.Range[2] - SliderSettings.Range[1])) > 5 and Slider.Main.AbsoluteSize.X * (SliderSettings.CurrentValue / (SliderSettings.Range[2] - SliderSettings.Range[1])) or 5, 1, 0)
+	-- Width of the progress bar for a value, min 5px
+	local function progressWidth(value)
+		local min, max = SliderSettings.Range[1], SliderSettings.Range[2]
+		local fraction = max ~= min and math.clamp((value - min) / (max - min), 0, 1) or 0
+		return math.max(Slider.Main.AbsoluteSize.X * fraction, 5)
+	end
 
+	Slider.Main.Progress.Size = UDim2.new(0, progressWidth(SliderSettings.CurrentValue), 1, 0)
+
+	SliderV.CurrentValue = SliderSettings.CurrentValue
 	Slider.Value.Text = tostring(SliderSettings.CurrentValue)
-	SliderV.CurrentValue = Slider.Value.Text
 
-	SliderSettings.Callback(SliderSettings.CurrentValue)
+	local initOk, initErr = pcall(SliderSettings.Callback, SliderSettings.CurrentValue)
+	if not initOk then
+		print("Aurexis Interface Library | "..SliderSettings.Name.." Callback Error " ..tostring(initErr))
+	end
 
 	Slider["MouseEnter"]:Connect(function()
 		tween(Slider.UIStroke, {Color = Color3.fromRGB(87, 84, 104)})
@@ -337,9 +347,11 @@ function Tab:CreateSlider(SliderSettings, Flag)
 
 				NewValue = math.floor(NewValue / SliderSettings.Increment + 0.5) * (SliderSettings.Increment * 10000000) / 10000000
 
-				Slider.Value.Text = tostring(NewValue)
-
 				if SliderSettings.CurrentValue ~= NewValue then
+					-- store first: the Text listener skips values that are already current
+					SliderSettings.CurrentValue = NewValue
+					SliderV.CurrentValue = NewValue
+					Slider.Value.Text = tostring(NewValue)
 					local Success, Response = pcall(function()
 						SliderSettings.Callback(NewValue)
 					end)
@@ -356,9 +368,6 @@ function Tab:CreateSlider(SliderSettings, Flag)
 						TweenService:Create(Slider.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
 					end
 
-					SliderSettings.CurrentValue = NewValue
-					SliderV.CurrentValue = SliderSettings.CurrentValue
-					-- Aurexis.Flags[SliderSettings.Flag] = SliderSettings
 				end
 			else
 				TweenService:Create(Slider.Main.Progress, TweenInfo.new(0.1, Enum.EasingStyle.Back, Enum.EasingDirection.In, 0, false), {Size = UDim2.new(0, Location - Slider.Main.AbsolutePosition.X > 5 and Location - Slider.Main.AbsolutePosition.X or 5, 1, 0)}):Play()
@@ -371,7 +380,9 @@ function Tab:CreateSlider(SliderSettings, Flag)
 
 		NewVal = NewVal or SliderSettings.CurrentValue
 
-		TweenService:Create(Slider.Main.Progress, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.InOut), {Size = UDim2.new(0, Slider.Main.AbsoluteSize.X * ((NewVal + SliderSettings.Range[1]) / (SliderSettings.Range[2] - SliderSettings.Range[1])) > 5 and Slider.Main.AbsoluteSize.X * (NewVal / (SliderSettings.Range[2] - SliderSettings.Range[1])) or 5, 1, 0)}):Play()
+		TweenService:Create(Slider.Main.Progress, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.InOut), {Size = UDim2.new(0, progressWidth(NewVal), 1, 0)}):Play()
+		SliderSettings.CurrentValue = NewVal
+		SliderV.CurrentValue = NewVal
 		if not bleh then Slider.Value.Text = tostring(NewVal) end
 		local Success, Response = pcall(function()
 			SliderSettings.Callback(NewVal)
@@ -406,7 +417,9 @@ function Tab:CreateSlider(SliderSettings, Flag)
 		end
 		if SliderSettings.Range[2] < (tonumber(Slider.Value.Text) or 0) then Slider.Value.Text = SliderSettings.Range[2] end
 		Slider.Value.Size = UDim2.fromOffset(Slider.Value.TextBounds.X, 23)
-		Set(tonumber(Slider.Value.Text), true)
+		local value = tonumber(Slider.Value.Text)
+		if value == nil or value == SliderSettings.CurrentValue then return end
+		Set(value, true)
 	end)
 
 	function SliderV:Set(NewSliderSettings)
@@ -430,6 +443,7 @@ function Tab:CreateSlider(SliderSettings, Flag)
 	end
 
 	function SliderV:Destroy()
+		if SliderV._themeConnection then SliderV._themeConnection:Disconnect() end
 		Slider.Visible = false
 		Slider:Destroy()
 	end
@@ -438,7 +452,7 @@ function Tab:CreateSlider(SliderSettings, Flag)
 		Aurexis.Options[Flag] = SliderV
 	end
 
-	AurexisUI.ThemeRemote:GetPropertyChangedSignal("Value"):Connect(function()
+	SliderV._themeConnection = AurexisUI.ThemeRemote:GetPropertyChangedSignal("Value"):Connect(function()
 		Slider.Main.color.Color = Aurexis.ThemeGradient
 		Slider.Main.UIStroke.color.Color = Aurexis.ThemeGradient
 	end)
@@ -606,11 +620,12 @@ function Tab:CreateToggle(ToggleSettings, Flag)
 	end
 
 	function ToggleV:Destroy()
+		if ToggleV._themeConnection then ToggleV._themeConnection:Disconnect() end
 		Toggle.Visible = false
 		Toggle:Destroy()
 	end
 
-	AurexisUI.ThemeRemote:GetPropertyChangedSignal("Value"):Connect(function()
+	ToggleV._themeConnection = AurexisUI.ThemeRemote:GetPropertyChangedSignal("Value"):Connect(function()
 		Toggle.toggle.color.Color = Aurexis.ThemeGradient
 		Toggle.toggle.UIStroke.color.Color = Aurexis.ThemeGradient
 	end)
@@ -702,7 +717,7 @@ function Tab:CreateBind(BindSettings, Flag)
 	Bind["MouseLeave"]:Connect(function()
 		tween(Bind.UIStroke, {Color = Color3.fromRGB(64,61,76)})
 	end)
-	UserInputService.InputBegan:Connect(function(input, processed)
+	BindV._inputConnection = UserInputService.InputBegan:Connect(function(input, processed)
 
 		if CheckingForKey then
 			if input.KeyCode == Enum.KeyCode.Delete or input.KeyCode == Enum.KeyCode.Backspace then
@@ -720,7 +735,7 @@ function Tab:CreateBind(BindSettings, Flag)
 				BindSettings.CurrentBind = tostring(NewKeyNoEnum)
 				BindV.CurrentBind = BindSettings.CurrentBind
 				local Success, Response = pcall(function()
-					BindSettings.Callback(BindSettings.CurrentBind)
+					BindSettings.OnChangedCallback(input.KeyCode)
 				end)
 				if not Success then
 					TweenService:Create(Bind, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
@@ -818,7 +833,8 @@ function Tab:CreateBind(BindSettings, Flag)
 			Description = BindSettings.Description,
 			CurrentBind =  BindSettings.CurrentBind,
 			HoldToInteract = BindSettings.HoldToInteract,
-			Callback = BindSettings.Callback
+			Callback = BindSettings.Callback,
+			OnChangedCallback = BindSettings.OnChangedCallback
 		}, NewBindSettings or {})
 
 		BindV.Settings = NewBindSettings
@@ -838,6 +854,7 @@ function Tab:CreateBind(BindSettings, Flag)
 	end
 
 	function BindV:Destroy()
+		if BindV._inputConnection then BindV._inputConnection:Disconnect() end
 		Bind.Visible = false
 		Bind:Destroy()
 	end
@@ -925,7 +942,7 @@ function Tab:CreateKeybind(BindSettings)
 	Bind["MouseLeave"]:Connect(function()
 		tween(Bind.UIStroke, {Color = Color3.fromRGB(64,61,76)})
 	end)
-	UserInputService.InputBegan:Connect(function(input, processed)
+	BindV._inputConnection = UserInputService.InputBegan:Connect(function(input, processed)
 
 		if CheckingForKey then
 			if input.KeyCode == Enum.KeyCode.Delete or input.KeyCode == Enum.KeyCode.Backspace then
@@ -1025,7 +1042,8 @@ function Tab:CreateKeybind(BindSettings)
 			Description = BindSettings.Description,
 			CurrentBind =  BindSettings.CurrentBind,
 			HoldToInteract = BindSettings.HoldToInteract,
-			Callback = BindSettings.Callback
+			Callback = BindSettings.Callback,
+			OnChangedCallback = BindSettings.OnChangedCallback
 		}, NewBindSettings or {})
 
 		BindV.Settings = NewBindSettings
@@ -1045,6 +1063,7 @@ function Tab:CreateKeybind(BindSettings)
 	end
 
 	function BindV:Destroy()
+		if BindV._inputConnection then BindV._inputConnection:Disconnect() end
 		Bind.Visible = false
 		Bind:Destroy()
 	end
