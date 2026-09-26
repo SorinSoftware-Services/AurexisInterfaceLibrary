@@ -660,6 +660,7 @@ local function attachSectionControls(ctx)
 		}, BindSettings or {})
 
 		local CheckingForKey = false
+		BindV.CurrentBind = BindSettings.CurrentBind
 
 		local Bind
 		if BindSettings.Description ~= nil and BindSettings.Description ~= "" then
@@ -744,6 +745,7 @@ local function attachSectionControls(ctx)
 					local NewKeyNoEnum = SplitMessage[3]
 					Bind.BindFrame.BindBox.Text = tostring(NewKeyNoEnum)
 					BindSettings.CurrentBind = tostring(NewKeyNoEnum)
+					BindV.CurrentBind = BindSettings.CurrentBind
 					local Success, Response = pcall(function()
 						BindSettings.OnChangedCallback(input.KeyCode)
 					end)
@@ -1332,7 +1334,9 @@ local function attachSectionControls(ctx)
 
 			if DropdownSettings.SpecialType == "Player" then
 				PlayerTableRefresh()
-				if NewDropdownSettings.CurrentOption == nil then
+				local current = DropdownSettings.CurrentOption
+				if type(current) == "table" then current = current[1] end
+				if not table.find(DropdownSettings.Options, current) then
 					DropdownSettings.CurrentOption = DropdownSettings.Options[1]
 				end
 				WatchPlayers()

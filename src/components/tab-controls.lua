@@ -659,6 +659,7 @@ function Tab:CreateBind(BindSettings, Flag)
 	}, BindSettings or {})
 
 	local CheckingForKey = false
+	BindV.CurrentBind = BindSettings.CurrentBind
 
 	local Bind
 	if BindSettings.Description ~= nil and BindSettings.Description ~= "" then
@@ -884,6 +885,7 @@ function Tab:CreateKeybind(BindSettings)
 
 	local BindV = { Settings = BindSettings, Active = false }
 	local CheckingForKey = false
+	BindV.CurrentBind = BindSettings.CurrentBind
 
 	local Bind
 	if BindSettings.Description ~= nil and BindSettings.Description ~= "" then
@@ -958,6 +960,7 @@ function Tab:CreateKeybind(BindSettings)
 				local NewKeyNoEnum = SplitMessage[3]
 				Bind.BindFrame.BindBox.Text = tostring(NewKeyNoEnum)
 				BindSettings.CurrentBind = tostring(NewKeyNoEnum)
+				BindV.CurrentBind = BindSettings.CurrentBind
 				Bind.BindFrame.BindBox:ReleaseFocus()
 			end
 		elseif BindSettings.CurrentBind ~= nil and BindSettings.CurrentBind ~= "None" and BindSettings.CurrentBind ~= "" and (function() local ok,kc = pcall(function() return Enum.KeyCode[BindSettings.CurrentBind] end) return ok and kc~=nil and input.KeyCode==kc end)() and not processed then
@@ -1531,7 +1534,9 @@ function Tab:CreateDropdown(DropdownSettings, Flag)
 
 		if DropdownSettings.SpecialType == "Player" then
 			PlayerTableRefresh()
-			if NewDropdownSettings.CurrentOption == nil then
+			local current = DropdownSettings.CurrentOption
+			if type(current) == "table" then current = current[1] end
+			if not table.find(DropdownSettings.Options, current) then
 				DropdownSettings.CurrentOption = DropdownSettings.Options[1]
 			end
 			WatchPlayers()
@@ -1990,7 +1995,7 @@ function Tab:BuildConfigSection()
 		Description = "Set a config to auto load setting in your next session.",
 		Callback = function()
 			local name = selectedConfig
-			if not name or name == "" then
+			if type(name) ~= "string" or name == "" then
 				Aurexis:Notification({
 					Title = "Interface",
 					Icon = "warning",
@@ -2074,7 +2079,7 @@ local ClassParser = {
 			return {
 				type = "Keybind",
 				flag = Flag,
-				bind = data.CurrentBind
+				bind = data.CurrentBind or (data.Settings and data.Settings.CurrentBind)
 			}
 		end,
 		Load = function(Flag, data)
@@ -2254,10 +2259,10 @@ SetFolder()
 function Aurexis:SaveConfig(Path)
 	if isStudio then return "Config system unavailable." end
 
-	if (not Path) then
+	if type(Path) ~= "string" or Path == "" then
 		return false, "Please select a config file."
 	end
-	if Path:find("[/\\]") or Path:find("..", 1, true) then
+	if Path:find("[/\\]") then
 		return false, "Invalid config name."
 	end
 
@@ -2291,10 +2296,10 @@ end
 function Aurexis:LoadConfig(Path)
 	if isStudio then return "Config system unavailable." end
 
-	if (not Path) then
+	if type(Path) ~= "string" or Path == "" then
 		return false, "Please select a config file."
 	end
-	if Path:find("[/\\]") or Path:find("..", 1, true) then
+	if Path:find("[/\\]") then
 		return false, "Invalid config name."
 	end
 
