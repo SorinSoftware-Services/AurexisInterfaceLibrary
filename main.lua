@@ -154,7 +154,7 @@ end
 
 
 
-local function requireRemote(path)
+local function requireRemote(path, required)
 	local ok, result = pcall(function()
 		local body = game:HttpGet(BASE_URL .. path)
 		local replacements = {
@@ -172,10 +172,13 @@ local function requireRemote(path)
 	end)
 	if ok then
 		return result
-	else
-		warn("?? Failed to load module: " .. path .. " ? " .. tostring(result))
-		return {}
 	end
+	if required then
+		-- fail loudly here instead of "attempt to call a table value" further down
+		error("Aurexis | Failed to load required module " .. path .. ": " .. tostring(result), 0)
+	end
+	warn("Aurexis | Failed to load module " .. path .. ": " .. tostring(result))
+	return {}
 end
 
 local IconModule = requireRemote("src/icons.lua")
@@ -796,6 +799,13 @@ local AurexisUI = isStudio and script.Parent:WaitForChild("Aurexis UI") or game:
 local SizeBleh = nil
 local mainWindowFrame = nil
 
+-- Connections to services/camera that outlive the GUI; disconnected in Aurexis:Destroy()
+local globalConnections = {}
+local function trackConnection(connection)
+	table.insert(globalConnections, connection)
+	return connection
+end
+
 -- Helper to prevent camera movement on mobile
 local MOBILE_BLOCK_ACTION = "Aurexis_BlockMobileTouch"
 local function setMobileInputBlocked(block)
@@ -817,7 +827,17 @@ local function setMobileInputBlocked(block)
 	end
 end
 
+-- Bumped on every Hide/Unhide per window, so a Hide still waiting on its
+-- tweens doesn't collapse a window that was re-opened in the meantime
+local visibilityVersions = setmetatable({}, {__mode = "k"})
+local function bumpVisibility(Window)
+	local version = (visibilityVersions[Window] or 0) + 1
+	visibilityVersions[Window] = version
+	return version
+end
+
 local function Hide(Window, bind, notif)
+	local version = bumpVisibility(Window)
 	SizeBleh = Window.Size
 	bind = string.split(tostring(bind), "Enum.KeyCode.")
 	bind = bind[2]
@@ -877,9 +897,11 @@ local function Hide(Window, bind, notif)
 	end
 
 	task.wait(0.28)
+	if visibilityVersions[Window] ~= version then return end
 	Window.Size = UDim2.new(0,0,0,0)
 	Window.Parent.ShadowHolder.Visible = false
 	task.wait()
+	if visibilityVersions[Window] ~= version then return end
 	Window.Elements.Parent.Visible = false
 	Window.Visible = false
 end
@@ -1351,7 +1373,10 @@ local KeySystem : Frame = Main.KeySystem
 -- 	end
 -- end
 
+local draggableBars = setmetatable({}, {__mode = "k"})
 local function Draggable(Bar, Window, enableTaptic, tapticOffset)
+	if not Bar or draggableBars[Bar] then return end
+	draggableBars[Bar] = true
 	pcall(function()
 		local Dragging, DragInput, MousePos, FramePos
 
@@ -1386,7 +1411,6 @@ local function Draggable(Bar, Window, enableTaptic, tapticOffset)
 				Input.Changed:Connect(function()
 					if Input.UserInputState == Enum.UserInputState.End then
 						Dragging = false
-						connectFunctions()
 
 						if enableTaptic then
 							TweenService:Create(dragBarCosmetic, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 100, 0, 4), BackgroundTransparency = 0.7}):Play()
@@ -1402,7 +1426,7 @@ local function Draggable(Bar, Window, enableTaptic, tapticOffset)
 			end
 		end)
 
-		UserInputService.InputChanged:Connect(function(Input)
+		trackConnection(UserInputService.InputChanged:Connect(function(Input)
 			if Input == DragInput and Dragging then
 				local Delta = Input.Position - MousePos
 
@@ -1414,18 +1438,19 @@ local function Draggable(Bar, Window, enableTaptic, tapticOffset)
 					dragBar.Position = newDragBarPosition
 				end
 			end
-		end)
+		end))
 
 	end)
 end
 
 -- Notification
 
-local NotificationService = requireRemote("src/services/notification.lua")
+local NotificationService = requireRemote("src/services/notification.lua", true)
 NotificationService(Aurexis, Kwargify, BlurModule, TweenService, Notifications)
 
 
 local function Unhide(Window, currentTab)
+	bumpVisibility(Window)
 	Window.Size = SizeBleh
 	Window.Elements.Visible = true
 	Window.Visible = true
@@ -1569,6 +1594,7 @@ function Aurexis:CreateWindow(WindowSettings)
 	}, WindowSettings.KeySettings.SecondAction)
 
 	local Passthrough = false
+	local KeySystemClosed = false
 
 	local defaultToggleKey = normalizeKeyCode(WindowSettings.ToggleKey) or Enum.KeyCode.K
 	local Window = {
@@ -1683,11 +1709,29 @@ function Aurexis:CreateWindow(WindowSettings)
 
 		if typeof(WindowSettings.KeySettings.Key) == "string" then WindowSettings.KeySettings.Key = {WindowSettings.KeySettings.Key} end
 
-		local direc = WindowSettings.KeySettings.SaveInRoot and "Aurexis/Configurations/" .. WindowSettings.ConfigSettings.RootFolder .. "/" .. WindowSettings.ConfigSettings.ConfigFolder .. "/Key System/" or "Aurexis/Configurations/" ..  WindowSettings.ConfigSettings.ConfigFolder .. "/Key System/"
+		local configSettings = WindowSettings.ConfigSettings
+		local useRoot = WindowSettings.KeySettings.SaveInRoot and configSettings.RootFolder ~= nil and configSettings.RootFolder ~= ""
+		local direc = useRoot and "Aurexis/Configurations/" .. configSettings.RootFolder .. "/" .. configSettings.ConfigFolder .. "/Key System/" or "Aurexis/Configurations/" .. configSettings.ConfigFolder .. "/Key System/"
+		local keyFile = direc .. WindowSettings.KeySettings.FileName .. ".aurexis"
+		local legacyKeyFile = direc .. WindowSettings.KeySettings.FileName .. ".Aurexis" -- older versions saved with this casing
 
-		if isfile and isfile(direc .. WindowSettings.KeySettings.FileName .. ".aurexis") then
-			for i, Key in ipairs(WindowSettings.KeySettings.Key) do
-				if string.find(readfile(direc .. WindowSettings.KeySettings.FileName .. ".Aurexis"), Key) then
+		local function readSavedKey()
+			if not (isfile and readfile) then return nil end
+			for _, path in ipairs({keyFile, legacyKeyFile}) do
+				local ok, content = pcall(function()
+					return isfile(path) and readfile(path) or nil
+				end)
+				if ok and type(content) == "string" then
+					return (content:gsub("^%s+", ""):gsub("%s+$", ""))
+				end
+			end
+			return nil
+		end
+
+		local savedKey = readSavedKey()
+		if savedKey and savedKey ~= "" then
+			for _, Key in ipairs(WindowSettings.KeySettings.Key) do
+				if Key ~= "" and savedKey == Key then
 					Passthrough = true
 					break
 				end
@@ -1716,7 +1760,9 @@ function Aurexis:CreateWindow(WindowSettings)
 			
 			Btn.Interact.MouseButton1Click:Connect(function()
 				if typesys == "Discord" then
-					setclipboard(tostring("https://discord.gg/"..KeySettings.SecondAction.Parameter)) -- Hunter if you see this I added copy also was too lazy to send u msg
+					if setclipboard then
+						setclipboard(tostring("https://discord.gg/"..KeySettings.SecondAction.Parameter))
+					end
 					if request then
 						request({
 							Url = 'http://127.0.0.1:6463/rpc?v=1',
@@ -1732,7 +1778,7 @@ function Aurexis:CreateWindow(WindowSettings)
 							})
 						})
 					end
-				else
+				elseif setclipboard then
 					setclipboard(tostring(KeySettings.SecondAction.Parameter))
 				end
 			end)
@@ -1769,11 +1815,20 @@ function Aurexis:CreateWindow(WindowSettings)
 					task.wait(0.51)
 					Passthrough = true
 					KeySystem.Visible = false
-					if WindowSettings.KeySettings.SaveKey then
-						if writefile then
-							writefile(direc .. WindowSettings.KeySettings.FileName .. ".Aurexis", FoundKey)
+					if WindowSettings.KeySettings.SaveKey and writefile then
+						local saved = pcall(function()
+							if makefolder and isfolder then
+								local path = ""
+								for part in direc:gmatch("[^/]+") do
+									path = path == "" and part or (path .. "/" .. part)
+									if not isfolder(path) then makefolder(path) end
+								end
+							end
+							writefile(keyFile, FoundKey)
+						end)
+						if saved then
+							Aurexis:Notification({Title = "Key System", Content = "The key for this script has been saved successfully.", Icon = "lock_open"})
 						end
-						Aurexis:Notification({Title = "Key System", Content = "The key for this script has been saved successfully.", Icon = "lock_open"})
 					end
 				else
 					if AttemptsRemaining == 0 then
@@ -1789,14 +1844,18 @@ function Aurexis:CreateWindow(WindowSettings)
 			end)
 
 			KeySystem.Close.MouseButton1Click:Connect(function()
-				
+				KeySystemClosed = true
 				Aurexis:Destroy()
 			end)
 		end
 	end
 
 	if WindowSettings.KeySystem then
-		repeat task.wait() until Passthrough
+		repeat task.wait() until Passthrough or KeySystemClosed
+		if not Passthrough then
+			-- Key prompt was closed: stop the calling script here instead of polling forever
+			coroutine.yield()
+		end
 	end
 
 	if WindowSettings.LoadingEnabled then
@@ -1862,7 +1921,7 @@ function Aurexis:CreateWindow(WindowSettings)
 	end
 
 	if Camera then
-		Camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateWindowSizeForViewport)
+		trackConnection(Camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateWindowSizeForViewport))
 	end
 
 	-- Block camera movement on mobile when window is open
@@ -1876,8 +1935,8 @@ function Aurexis:CreateWindow(WindowSettings)
 	local FirstTab = true
 
 -- HomeTab START
-local attachSectionControls = requireRemote("src/components/section-controls.lua")
-local attachTabControls = requireRemote("src/components/tab-controls.lua")
+local attachSectionControls = requireRemote("src/components/section-controls.lua", true)
+local attachTabControls = requireRemote("src/components/tab-controls.lua", true)
 
 if WindowSettings.HomeTab ~= false then
 	local HomeTabModule = requireRemote("src/components/home-tab.lua")
@@ -2411,7 +2470,7 @@ FirstTab = false
 		end)
 	end
 
-	UserInputService.InputBegan:Connect(function(input, gpe)
+	trackConnection(UserInputService.InputBegan:Connect(function(input, gpe)
 		if gpe then return end
 		if input.KeyCode == Window.Bind then
 			if Window.State then
@@ -2421,11 +2480,11 @@ FirstTab = false
 				-- Window is hidden → open it
 				Unhide(Main, Window.CurrentTab)
 				AurexisUI.MobileSupport.Visible = false
-				dragBar.Visible = true
+				if dragBar then dragBar.Visible = true end
 				Window.State = true
 			end
 		end
-	end)
+	end))
 
 	Main.Logo.MouseButton1Click:Connect(function()
 		if Navigation.Size.X.Offset == 205 then
@@ -2479,7 +2538,7 @@ FirstTab = false
 
 	AurexisUI.MobileSupport.Interact.MouseButton1Click:Connect(function()
 		Unhide(Main, Window.CurrentTab)
-		dragBar.Visible = true
+		if dragBar then dragBar.Visible = true end
 		Window.State = true
 		AurexisUI.MobileSupport.Visible = false
 	end)
@@ -2539,6 +2598,12 @@ end
 Aurexis:SetEnvironmentBlurEnabled(Aurexis.AllowEnvironmentBlur)
 
 function Aurexis:Destroy()
+    Aurexis._destroyed = true
+    for _, connection in ipairs(globalConnections) do
+        connection:Disconnect()
+    end
+    table.clear(globalConnections)
+    setMobileInputBlocked(false)
     Main.Visible = false
     for _, Notification in ipairs(Notifications:GetChildren()) do
         if Notification.ClassName == "Frame" then
