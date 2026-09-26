@@ -20,7 +20,15 @@ return function(Aurexis, Kwargify, BlurModule, TweenService, Notifications)
 
 			newNotification.Title.Text = data.Title
 			newNotification.Description.Text = data.Content
-			newNotification.Icon.Image = Aurexis:GetIcon(data.Icon, data.ImageSource)
+			-- Lucide icons come back as a table (sprite sheet), the others as a plain image id
+			local iconOk, iconResult = pcall(Aurexis.GetIcon, Aurexis, data.Icon, data.ImageSource)
+			if iconOk and typeof(iconResult) == "table" and iconResult.id then
+				newNotification.Icon.Image = "rbxassetid://" .. iconResult.id
+				newNotification.Icon.ImageRectSize = iconResult.imageRectSize
+				newNotification.Icon.ImageRectOffset = iconResult.imageRectOffset
+			elseif iconOk and type(iconResult) == "string" then
+				newNotification.Icon.Image = iconResult
+			end
 			newNotification.Description.TextWrapped = true
 
 			local stroke = newNotification:FindFirstChild("UIStroke")

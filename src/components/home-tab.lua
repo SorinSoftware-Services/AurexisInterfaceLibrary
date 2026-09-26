@@ -64,7 +64,13 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 	end)
 
 	-- === UI SETUP ===
-	HomeTabPage.icon.ImageLabel.Image = Players:GetUserThumbnailAsync(Players.LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
+	-- can throw (rate limit / web request failure); must not abort window creation
+	local thumbOk, thumbnail = pcall(function()
+		return Players:GetUserThumbnailAsync(Players.LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
+	end)
+	if thumbOk and thumbnail then
+		HomeTabPage.icon.ImageLabel.Image = thumbnail
+	end
 	HomeTabPage.player.user.RichText = true
 	HomeTabPage.player.user.Text = "You are using <b>" .. Release .. "</b>"
 
@@ -150,7 +156,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 				})
 			end
 			if request then
-				request({
+				pcall(request, {
 					Url = "http://127.0.0.1:6463/rpc?v=1",
 					Method = "POST",
 					Headers = {
@@ -905,6 +911,8 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 
 		local FEEDBACK_COOLDOWN = 60
 		local lastSubmitTime = 0
+		local sending = false
+		local submitButton, buttonGradient
 
 		local function getCooldownRemaining()
 			local elapsed = os.clock() - lastSubmitTime
@@ -946,11 +954,11 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 						submitButton.AutoButtonColor = false
 						submitButton.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
 						submitButton.TextColor3 = Color3.fromRGB(140, 140, 140)
-						buttonGradient.Enabled = false
+						if buttonGradient then buttonGradient.Enabled = false end
 					else
 						submitButton.BackgroundColor3 = Color3.fromRGB(86, 110, 190)
 						submitButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-						buttonGradient.Enabled = true
+						if buttonGradient then buttonGradient.Enabled = true end
 					end
 				end
 			end
@@ -965,7 +973,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		local contactBox, contactFrame = createLabeledInput(content, fontStrong, fontBody, "Contact", "Contact (optional)", 80)
 		contactFrame.LayoutOrder = 4
 
-		local submitButton = Instance.new("TextButton")
+		submitButton = Instance.new("TextButton")
 		submitButton.Name = "SubmitFeedback"
 		submitButton.AutoButtonColor = false
 		submitButton.Text = "Submit feedback"
@@ -986,7 +994,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		buttonStroke.Color = Color3.fromRGB(110, 140, 220)
 		buttonStroke.Parent = submitButton
 
-		local buttonGradient = Instance.new("UIGradient")
+		buttonGradient = Instance.new("UIGradient")
 		buttonGradient.Color = ColorSequence.new({
 			ColorSequenceKeypoint.new(0, Color3.fromRGB(86, 110, 190)),
 			ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 90, 200)),
@@ -999,6 +1007,7 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 		end
 
 		submitButton.MouseButton1Click:Connect(function()
+			if sending then return end
 			if getCooldownRemaining() > 0 then
 				notify("Feedback", "Please wait " .. getCooldownRemaining() .. "s before submitting again.", "warning")
 				return
@@ -1031,19 +1040,22 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 				game_id = game.GameId,
 				user_id = Players.LocalPlayer and Players.LocalPlayer.UserId or nil,
 				username = Players.LocalPlayer and Players.LocalPlayer.Name or nil,
-				executor = typeof(identifyexecutor) == "function" and identifyexecutor() or "Unknown",
+				executor = exec,
 				timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
 			}
 
+			-- block double clicks while the request is in flight
+			sending = true
 			local response, err = backendRequest(
 				BackendConfig.feedbackPath,
 				"POST",
 				payload
 			)
+			sending = false
 
 			if not response then
 				warn("[HomeTab] Feedback submission failed:", err)
-				notify("Feedback failed", "Response: " .. tostring(err), "error")
+				notify("Feedback failed", "Response: " .. tostring(err):sub(1, 200), "error")
 				return
 			end
 
@@ -1131,9 +1143,14 @@ return function(Window, Aurexis, Elements, Navigation, GetIcon, Kwargify, tween,
 					string.format("Upload: %s", getNetworkStat(NETWORK_STAT_ALIASES.upload, "KB/s")),
 					string.format("Download: %s", getNetworkStat(NETWORK_STAT_ALIASES.download, "KB/s")),
 					string.format("Memory: %s", getMemory()),
-					string.format("Executor: %s", typeof(identifyexecutor) == "function" and identifyexecutor() or "Unknown"),
+					string.format("Executor: %s", exec),
 				}, "\n")
 				statsText.Text = text
+			end
+			-- stats card is gone: stop sampling FPS
+			if fpsAccumulator.conn then
+				fpsAccumulator.conn:Disconnect()
+				fpsAccumulator.conn = nil
 			end
 		end)
 	end
