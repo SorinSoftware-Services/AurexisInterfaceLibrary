@@ -34,7 +34,18 @@ by Nebula Softworks
 
 
 
-local BASE_URL = "https://raw.githubusercontent.com/SorinSoftware-Services/AurexisInterfaceLibrary/main/"
+-- Branch to load modules from. Defaults to "main" (live). For testing, set
+-- getgenv().AUREXIS_BRANCH = "staging" before loading staging/main.lua.
+local BRANCH = "main"
+do
+	local env = getgenv and getgenv()
+	local override = env and env.AUREXIS_BRANCH
+	if type(override) == "string" and override:match("^[%w%-_%.]+$") then
+		BRANCH = override
+	end
+end
+
+local BASE_URL = "https://raw.githubusercontent.com/SorinSoftware-Services/AurexisInterfaceLibrary/" .. BRANCH .. "/"
 
 local Release = " Version 1.1.1"
 
