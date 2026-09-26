@@ -1209,14 +1209,38 @@ local function attachSectionControls(ctx)
 			end
 		end
 
-		local function PlayerTableRefresh()
-			for i,v in pairs(DropdownSettings.Options) do
-				table.remove(DropdownSettings.Options, i)
+		local function PlayerTableRefresh(leaving)
+			table.clear(DropdownSettings.Options)
+			for _, player in ipairs(Players:GetPlayers()) do
+				if player ~= leaving then
+					table.insert(DropdownSettings.Options, player.Name)
+				end
 			end
+		end
 
-			for i,v in pairs(Players:GetChildren()) do
-				table.insert(DropdownSettings.Options, v.Name)
+		-- Highlights the selected option(s); ignores names that are not in the list
+		local function HighlightSelected(selection)
+			local names = type(selection) == "table" and selection or {selection}
+			for _, name in ipairs(names) do
+				local option = Dropdown.List:FindFirstChild(name == "Template" and "Template (Name)" or tostring(name))
+				if option then
+					tween(option, {TextColor3 = Color3.fromRGB(240,240,240), BackgroundTransparency = 0.95})
+				end
 			end
+		end
+
+		local playerConnections
+		local function WatchPlayers()
+			if playerConnections then return end
+			local function onPlayersChanged(leaving)
+				PlayerTableRefresh(leaving)
+				Refresh()
+				HighlightSelected(DropdownSettings.CurrentOption)
+			end
+			playerConnections = {
+				Players.PlayerAdded:Connect(function() onPlayersChanged() end),
+				Players.PlayerRemoving:Connect(onPlayersChanged),
+			}
 		end
 
 		Dropdown.Interact.MouseButton1Click:Connect(function()
@@ -1232,16 +1256,9 @@ local function attachSectionControls(ctx)
 		end)
 
 		if DropdownSettings.SpecialType == "Player" then
-
-			for i,v in pairs(DropdownSettings.Options) do
-				table.remove(DropdownSettings.Options, i)
-			end
 			PlayerTableRefresh()
 			DropdownSettings.CurrentOption = DropdownSettings.Options[1]
-
-			Players.PlayerAdded:Connect(function() PlayerTableRefresh() end)
-			Players.PlayerRemoving:Connect(function() PlayerTableRefresh() end)
-
+			WatchPlayers()
 		end
 
 		Refresh()
@@ -1263,13 +1280,7 @@ local function attachSectionControls(ctx)
 		end
 		if ind == 1 then bleh = DropdownSettings.CurrentOption[1] else bleh = DropdownSettings.CurrentOption end
 		SafeCallback(bleh)
-		if type(bleh) == "string" then 
-			tween(Dropdown.List[bleh], {TextColor3 = Color3.fromRGB(240,240,240), BackgroundTransparency = 0.95})
-		else
-			for i,v in pairs(bleh) do
-				tween(Dropdown.List[v], {TextColor3 = Color3.fromRGB(240,240,240), BackgroundTransparency = 0.95})
-			end
-		end
+		HighlightSelected(bleh)
 
 		if DropdownSettings.MultipleOptions then
 			if DropdownSettings.CurrentOption and type(DropdownSettings.CurrentOption) == "table" then
@@ -1284,9 +1295,7 @@ local function attachSectionControls(ctx)
 				DropdownSettings.CurrentOption = {}
 				Dropdown.Selected.PlaceholderText = "None"
 			end
-			for _, name in pairs(DropdownSettings.CurrentOption) do
-				tween(Dropdown.List[name], {TextColor3 = Color3.fromRGB(227,227,227), BackgroundTransparency = 0.95})
-			end
+			HighlightSelected(DropdownSettings.CurrentOption)
 		else
 			Dropdown.Selected.PlaceholderText = DropdownSettings.CurrentOption[1] or "None"
 		end
@@ -1305,15 +1314,11 @@ local function attachSectionControls(ctx)
 			end
 
 			if DropdownSettings.SpecialType == "Player" then
-
-				for i,v in pairs(DropdownSettings.Options) do
-					table.remove(DropdownSettings.Options, i)
-				end
 				PlayerTableRefresh()
-				DropdownSettings.CurrentOption = DropdownSettings.Options[1]                    
-				Players.PlayerAdded:Connect(function() PlayerTableRefresh() end)
-				Players.PlayerRemoving:Connect(function() PlayerTableRefresh() end)
-
+				if NewDropdownSettings.CurrentOption == nil then
+					DropdownSettings.CurrentOption = DropdownSettings.Options[1]
+				end
+				WatchPlayers()
 			end
 
 			Refresh()
@@ -1340,7 +1345,8 @@ local function attachSectionControls(ctx)
 					tween(Option, {TextColor3 = Color3.fromRGB(200,200,200), BackgroundTransparency = 0.98})
 				end
 			end
-			tween(Dropdown.List[bleh], {TextColor3 = Color3.fromRGB(240,240,240), BackgroundTransparency = 0.95})
+			HighlightSelected(bleh)
+			DropdownV.CurrentOption = DropdownSettings.CurrentOption
 
 			if DropdownSettings.MultipleOptions then
 				if DropdownSettings.CurrentOption and type(DropdownSettings.CurrentOption) == "table" then
@@ -1355,9 +1361,7 @@ local function attachSectionControls(ctx)
 					DropdownSettings.CurrentOption = {}
 					Dropdown.Selected.PlaceholderText = "None"
 				end
-				for _, name in pairs(DropdownSettings.CurrentOption) do
-					tween(Dropdown.List[name], {TextColor3 = Color3.fromRGB(227,227,227), BackgroundTransparency = 0.95})
-				end
+				HighlightSelected(DropdownSettings.CurrentOption)
 			else
 				Dropdown.Selected.PlaceholderText = DropdownSettings.CurrentOption[1] or "None"
 			end
@@ -1368,6 +1372,12 @@ local function attachSectionControls(ctx)
 		end
 
 		function DropdownV:Destroy()
+			if playerConnections then
+				for _, connection in ipairs(playerConnections) do
+					connection:Disconnect()
+				end
+				playerConnections = nil
+			end
 			Dropdown.Visible = false
 			Dropdown:Destroy()
 		end
@@ -1385,7 +1395,7 @@ local function attachSectionControls(ctx)
 	-- Color Picker
 	function Section:CreateColorPicker(ColorPickerSettings, Flag) -- by Rayfield/Throit
 		TabPage.Position = UDim2.new(0,0,0,28)
-		local ColorPickerV = {IgnoreClass = false, Class = "Colorpicker", Settings = ColorPickerSettings}
+		local ColorPickerV = {IgnoreConfig = false, Class = "Colorpicker", Settings = ColorPickerSettings}
 
 		ColorPickerSettings = Kwargify({
 			Name = "Color Picker",
@@ -1396,11 +1406,7 @@ local function attachSectionControls(ctx)
 			end
 		}, ColorPickerSettings or {})
 
-		local function Color3ToHex(color)
-			return string.format("#%02X%02X%02X", math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255))
-		end
-
-		ColorPickerV.Color = Color3ToHex(ColorPickerSettings.Color)
+		ColorPickerV.Color = ColorPickerSettings.Color
 
 		local closedsize = UDim2.new(0, 75, 0, 22)
 		local openedsize = UDim2.new(0, 219, 0, 129)
@@ -1449,7 +1455,7 @@ local function attachSectionControls(ctx)
 
 		local opened = false
 
-		local mouse = game.Players.LocalPlayer:GetMouse()
+		local mouse = Players.LocalPlayer:GetMouse()
 		Main.Image = "http://www.roblox.com/asset/?id=11415645739"
 		local mainDragging = false 
 		local sliderDragging = false 
@@ -1466,7 +1472,7 @@ local function attachSectionControls(ctx)
 				tween(Display, {BackgroundTransparency = 0})
 			end
 		end)
-		UserInputService.InputEnded:Connect(function(input, gameProcessed) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+		local inputEndedConnection = UserInputService.InputEnded:Connect(function(input, gameProcessed) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
 				mainDragging = false
 				sliderDragging = false
 			end end)
@@ -1487,75 +1493,71 @@ local function attachSectionControls(ctx)
 			sliderDragging = true 
 		end)
 		local h,s,v = ColorPickerSettings.Color:ToHSV()
-		local color = Color3.fromHSV(h,s,v) 
-		local r,g,b = math.floor((h*255)+0.5),math.floor((s*255)+0.5),math.floor((v*255)+0.5)
-		local hex = string.format("#%02X%02X%02X",color.R*0xFF,color.G*0xFF,color.B*0xFF)
-		ColorPicker.HexInput.InputBox.Text = hex
-		local function setDisplay(hp,sp,vp)
-			--Main
+
+		local function toRGB(color)
+			return math.floor((color.R*255)+0.5), math.floor((color.G*255)+0.5), math.floor((color.B*255)+0.5)
+		end
+
+		-- Redraws picker, slider and text boxes from the shared h,s,v
+		local function setDisplay()
+			local color = Color3.fromHSV(h,s,v)
 			Main.MainPoint.Position = UDim2.new(s,-Main.MainPoint.AbsoluteSize.X/2,1-v,-Main.MainPoint.AbsoluteSize.Y/2)
-			Main.MainPoint.ImageColor3 = Color3.fromHSV(hp,sp,vp)
-			Background.BackgroundColor3 = Color3.fromHSV(hp,1,1)
-			Display.BackgroundColor3 = Color3.fromHSV(hp,sp,vp)
-			--Slider 
-			local x = hp * Slider.AbsoluteSize.X
+			Main.MainPoint.ImageColor3 = color
+			Background.BackgroundColor3 = Color3.fromHSV(h,1,1)
+			Display.BackgroundColor3 = color
+			local x = h * Slider.AbsoluteSize.X
 			Slider.SliderPoint.Position = UDim2.new(0,x-Slider.SliderPoint.AbsoluteSize.X/2,0.5,0)
-			Slider.SliderPoint.ImageColor3 = Color3.fromHSV(hp,1,1)
-			local color = Color3.fromHSV(hp,sp,vp) 
-			local r,g,b = math.floor((color.R*255)+0.5),math.floor((color.G*255)+0.5),math.floor((color.B*255)+0.5)
+			Slider.SliderPoint.ImageColor3 = Color3.fromHSV(h,1,1)
+			local r,g,b = toRGB(color)
 			ColorPicker.RInput.InputBox.Text = tostring(r)
 			ColorPicker.GInput.InputBox.Text = tostring(g)
 			ColorPicker.BInput.InputBox.Text = tostring(b)
-			hex = string.format("#%02X%02X%02X",color.R*0xFF,color.G*0xFF,color.B*0xFF)
-			ColorPicker.HexInput.InputBox.Text = hex
+			ColorPicker.HexInput.InputBox.Text = string.format("#%02X%02X%02X", r, g, b)
 		end
-		setDisplay(h,s,v)
+
+		-- Stores the current h,s,v as the picker's color and fires the callback
+		local function commit()
+			local color = Color3.fromRGB(toRGB(Color3.fromHSV(h,s,v)))
+			ColorPickerSettings.Color = color
+			ColorPickerV.Color = color
+			SafeCallback(color)
+		end
+
+		setDisplay()
 		ColorPicker.HexInput.InputBox.FocusLost:Connect(function()
-			if not pcall(function()
-					local r, g, b = string.match(ColorPicker.HexInput.InputBox.Text, "^#?(%w%w)(%w%w)(%w%w)$")
-					local rgbColor = Color3.fromRGB(tonumber(r, 16),tonumber(g, 16), tonumber(b, 16))
-					h,s,v = rgbColor:ToHSV()
-					hex = ColorPicker.HexInput.InputBox.Text
-					setDisplay()
-					ColorPickerSettings.Color = rgbColor
-				end) 
-			then 
-				ColorPicker.HexInput.InputBox.Text = hex 
+			local r, g, b = string.match(ColorPicker.HexInput.InputBox.Text, "^%s*#?(%x%x)(%x%x)(%x%x)%s*$")
+			if r then
+				h,s,v = Color3.fromRGB(tonumber(r, 16), tonumber(g, 16), tonumber(b, 16)):ToHSV()
+				setDisplay()
+				commit()
+			else
+				setDisplay() -- invalid input: restore current value
 			end
-			local r,g,b = math.floor((h*255)+0.5),math.floor((s*255)+0.5),math.floor((v*255)+0.5)
-			ColorPickerSettings.Color = Color3.fromRGB(r,g,b)
-			SafeCallback( Color3.fromRGB(r,g,b))
 		end)
 		--RGB
 		local function rgbBoxes(box,toChange)
-			local value = tonumber(box.Text) 
-			local color = Color3.fromHSV(h,s,v) 
-			local oldR,oldG,oldB = math.floor((color.R*255)+0.5),math.floor((color.G*255)+0.5),math.floor((color.B*255)+0.5)
-			local save 
-			if toChange == "R" then save = oldR;oldR = value elseif toChange == "G" then save = oldG;oldG = value else save = oldB;oldB = value end
-			if value then 
-				value = math.clamp(value,0,255)
-				h,s,v = Color3.fromRGB(oldR,oldG,oldB):ToHSV()
-				setDisplay()
-			else 
-				box.Text = tostring(save)
+			local value = tonumber(box.Text)
+			if not value then
+				setDisplay() -- invalid input: restore current value
+				return
 			end
-			local r,g,b = math.floor((color.R*255)+0.5),math.floor((color.G*255)+0.5),math.floor((color.B*255)+0.5)
-			ColorPickerSettings.Color = Color3.fromRGB(r,g,b)
+			value = math.clamp(math.floor(value + 0.5),0,255)
+			local r,g,b = toRGB(Color3.fromHSV(h,s,v))
+			if toChange == "R" then r = value elseif toChange == "G" then g = value else b = value end
+			h,s,v = Color3.fromRGB(r,g,b):ToHSV()
+			setDisplay()
+			commit()
 		end
-		ColorPicker.RInput.InputBox.FocusLost:connect(function()
+		ColorPicker.RInput.InputBox.FocusLost:Connect(function()
 			rgbBoxes(ColorPicker.RInput.InputBox,"R")
-			SafeCallback(Color3.fromRGB(r,g,b))
 		end)
-		ColorPicker.GInput.InputBox.FocusLost:connect(function()
+		ColorPicker.GInput.InputBox.FocusLost:Connect(function()
 			rgbBoxes(ColorPicker.GInput.InputBox,"G")
-			SafeCallback(Color3.fromRGB(r,g,b))
 		end)
-		ColorPicker.BInput.InputBox.FocusLost:connect(function()
+		ColorPicker.BInput.InputBox.FocusLost:Connect(function()
 			rgbBoxes(ColorPicker.BInput.InputBox,"B")
-			SafeCallback(Color3.fromRGB(r,g,b))
 		end)
-		RunService.RenderStepped:connect(function()
+		local renderConnection = RunService.RenderStepped:Connect(function()
 			if mainDragging then 
 				local localX = math.clamp(mouse.X-Main.AbsolutePosition.X,0,Main.AbsoluteSize.X)
 				local localY = math.clamp(mouse.Y-Main.AbsolutePosition.Y,0,Main.AbsoluteSize.Y)
@@ -1606,18 +1608,14 @@ local function attachSectionControls(ctx)
 			ColorPicker.Title.Text = ColorPickerSettings.Name
 			ColorPicker.Visible = true
 
-			local h,s,v = ColorPickerSettings.Color:ToHSV()
-			local color = Color3.fromHSV(h,s,v) 
-			local r,g,b = math.floor((color.R*255)+0.5),math.floor((color.G*255)+0.5),math.floor((color.B*255)+0.5)
-			local hex = string.format("#%02X%02X%02X",color.R*0xFF,color.G*0xFF,color.B*0xFF)
-			ColorPicker.HexInput.InputBox.Text = hex
-			setDisplay(h,s,v)
-			SafeCallback(Color3.fromRGB(r,g,b))
-
-			ColorPickerV.Color = ColorPickerSettings.Color
+			h,s,v = ColorPickerSettings.Color:ToHSV()
+			setDisplay()
+			commit()
 		end
 
 		function ColorPickerV:Destroy()
+			if renderConnection then renderConnection:Disconnect() end
+			if inputEndedConnection then inputEndedConnection:Disconnect() end
 			ColorPicker:Destroy()
 		end
 
