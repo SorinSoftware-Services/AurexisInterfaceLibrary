@@ -1897,8 +1897,9 @@ function Tab:BuildConfigSection()
 					Title = "Interface",
 					Icon = "error",
 					ImageSource = "Material",
-					Content = "Unable to save config, return error: " .. returned
+					Content = "Unable to save config, return error: " .. tostring(returned)
 				})
+				return
 			end
 
 			Aurexis:Notification({
@@ -1989,6 +1990,15 @@ function Tab:BuildConfigSection()
 		Description = "Set a config to auto load setting in your next session.",
 		Callback = function()
 			local name = selectedConfig
+			if not name or name == "" then
+				Aurexis:Notification({
+					Title = "Interface",
+					Icon = "warning",
+					ImageSource = "Material",
+					Content = "Select a config first."
+				})
+				return
+			end
 			writefile(Aurexis.Folder .. "/settings/autoload.txt", name)
 			loadlabel:Set({ Text = "Current autoload config: " .. name })
 
@@ -2247,6 +2257,9 @@ function Aurexis:SaveConfig(Path)
 	if (not Path) then
 		return false, "Please select a config file."
 	end
+	if Path:find("[/\\]") or Path:find("..", 1, true) then
+		return false, "Invalid config name."
+	end
 
 	local fullPath = Aurexis.Folder .. "/settings/" .. Path .. ".aurexis"
 
@@ -2280,6 +2293,9 @@ function Aurexis:LoadConfig(Path)
 
 	if (not Path) then
 		return false, "Please select a config file."
+	end
+	if Path:find("[/\\]") or Path:find("..", 1, true) then
+		return false, "Invalid config name."
 	end
 
 	local file = Aurexis.Folder .. "/settings/" .. Path .. ".aurexis"
